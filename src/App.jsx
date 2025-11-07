@@ -4,7 +4,7 @@
 // Import React hooks
 import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 
-// Import Firebase modules (Modular syntax with bare specifiers)
+// Import Firebase modules
 import { initializeApp } from "firebase/app";
 import {
   getFirestore,
@@ -50,26 +50,15 @@ try {
 }
 
 // --- App ID Handling ---
-const appId = "default-app-id"; // Simple ID for a public app
+const appId = "default-app-id";
 
 // --- Constants ---
 const ACCESS_CODE = "91965";
 const SITE_NAMES = [
-  "425 California",
-  "101 Mission",
-  "425 Market",
-  "180 Montgomery",
-  "360 Spear",
-  "1019 Market",
-  "@220 Montgomery",
-  "Sutro",
-  "201 Mission",
-  "111 Pine",
-  "501 2nd",
-  "@360 Spear",
-  "420 23rd",
-  "101 Mission",
-  "@350 Spear",
+  "425 California", "101 Mission", "425 Market", "180 Montgomery",
+  "360 Spear", "1019 Market", "@220 Montgomery", "Sutro",
+  "201 Mission", "111 Pine", "501 2nd", "@360 Spear",
+  "420 23rd", "101 Mission", "@350 Spear",
 ];
 const FONT_COLORS = ["#000000", "#FFFFFF", "#FF0000"]; // black, white, red
 const FILL_COLORS = ["#FFFFFF", "#008000", "#0000FF", "#000000", "#FFA500"]; // white, green, blue, black, orange
@@ -172,6 +161,17 @@ const useUserAccess = () => {
         localStorage.removeItem("scheduleUser");
         setUserInfo(null);
       }
+      // CRITICAL FIX: Re-load userInfo if auth changes and local storage exists
+      if (user && user.uid && !userInfo) {
+        try {
+          const savedUser = localStorage.getItem("scheduleUser");
+          if (savedUser) {
+            setUserInfo(JSON.parse(savedUser));
+          }
+        } catch (e) {
+          console.error("Error reloading user info:", e);
+        }
+      }
     });
 
     initAuth();
@@ -206,7 +206,7 @@ const useUserAccess = () => {
 
     try {
       localStorage.setItem("scheduleUser", JSON.stringify(newInfo));
-      setUserInfo(newInfo);
+      setUserInfo(newInfo); // Update state to trigger re-render and check `hasAccess`
       return { success: true, error: null };
     } catch (e) {
       console.error("Error saving user info:", e);
@@ -511,11 +511,8 @@ const Modal = ({ children, onClose }) => {
  */
 const AddShiftModal = ({
   day,
-  weekId,
   onClose,
-  firestore,
-  userId,
-  appId,
+  onAddShift,
 }) => {
   const [site, setSite] = useState("");
   const [startTime, setStartTime] = useState("");
@@ -558,10 +555,6 @@ const AddShiftModal = ({
       setError("Time must be in HHMM format.");
       return;
     }
-    if (!firestore) {
-      setError("Database not connected.");
-      return;
-    }
     setError("");
 
     const newShift = {
@@ -575,43 +568,8 @@ const AddShiftModal = ({
       comments: [],
     };
 
-    const collectionPath = `schedule-weeks`; // Use simple path for local/public build
-    const weekDocRef = doc(firestore, collectionPath, weekId); // Modular syntax
-
     try {
-      const weekDoc = await getDoc(weekDocRef); // Modular syntax
-
-      if (weekDoc.exists()) {
-        const dayData = weekDoc.data().days;
-        const dayIndex = dayData.findIndex(
-          (d) => d.date === day.date.toISOString().split("T")[0]
-        );
-
-        if (dayIndex > -1) {
-          const newDayData = [...dayData];
-          newDayData[dayIndex].shifts.push(newShift);
-          await updateDoc(weekDocRef, { days: newDayData }); // Modular syntax
-        } else {
-          console.warn("Day index not found, adding shift to first day.");
-          const newDayData = [...dayData];
-          newDayData[0].shifts.push(newShift);
-          await updateDoc(weekDocRef, { days: newDayData }); // Modular syntax
-        }
-      } else {
-        const newWeekData = getWeekDays(getStartOfWeek(day.date)).map(
-          (d) => ({
-            date: d.toISOString().split("T")[0],
-            shifts:
-              d.toISOString().split("T")[0] ===
-              day.date.toISOString().split("T")[0]
-                ? [newShift]
-                : [],
-            notes: [], // Also initialize notes on new week
-          })
-        );
-        await setDoc(weekDocRef, { days: newWeekData }); // Modular syntax
-      }
-
+      await onAddShift(day, newShift);
       onClose();
     } catch (err) {
       console.error("Error adding shift:", err);
@@ -1328,7 +1286,7 @@ const NoteIcon = () => (
 );
 
 // --- Main App Component ---
-function App() {
+const App = () => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [weekData, setWeekData] = useState({ days: [] });
   const [loading, setLoading] = useState(true);
@@ -1540,6 +1498,31 @@ function App() {
     // Don't close modal, just update
   };
 
+  /**
+   * Adds a new shift to a specific day.
+   */
+  const handleAddShift = async (day, newShift) => {
+    if (!db) {
+      console.error("Cannot add shift, DB not connected.");
+      return;
+    }
+    const dayString = day.date.toISOString().split("T")[0];
+    const currentDays = await getWeekDoc();
+    const dayIndex = currentDays.findIndex((d) => d.date === dayString);
+
+    if (dayIndex === -1) {
+      console.error("Day not found in week data.");
+      return;
+    }
+
+    // Ensure shifts array exists
+    currentDays[dayIndex].shifts = currentDays[dayIndex].shifts || [];
+    currentDays[dayIndex].shifts.push(newShift);
+
+    const weekDocRef = doc(db, collectionPath, weekId); // Modular syntax
+    await setDoc(weekDocRef, { days: currentDays }, { merge: true }); // Modular syntax
+  };
+
   // --- Navigation Handlers ---
   const goToPrevWeek = () => {
     setCurrentDate((prev) => new Date(prev.setDate(prev.getDate() - 7)));
@@ -1568,15 +1551,19 @@ function App() {
   };
 
   const openAddShiftModal = (day) => {
-    if (!hasAccess) return;
+    // FIX: Force read local storage here to ensure hasAccess is fresh before opening.
+    const userAccess = JSON.parse(localStorage.getItem('scheduleUser'));
+
+    // The button is shown if 'hasAccess' is true, but this click handler must also check it.
+    if (!userAccess || !userAccess.hasAccess) {
+      console.warn("Attempted to open Add Shift modal without edit access. User must sign up with code.");
+      return;
+    }
     openModal(
       <AddShiftModal
         day={day}
-        weekId={weekId}
         onClose={closeModal}
-        firestore={db}
-        userId={userId}
-        appId={appId}
+        onAddShift={handleAddShift}
       />
     );
   };
@@ -1760,8 +1747,6 @@ function App() {
   }
 
   return (
-    // <--- THIS IS THE FIX
-    // Add all the theme classes to the main div
     <div
       className="p-4 md:p-6 bg-black min-h-screen font-sans text-gray-100"
       onClick={() => {
@@ -1845,7 +1830,7 @@ function App() {
         menuState={contextMenu}
         onClose={() => setContextMenu({ visible: false })}
         onEdit={handleContextEdit}
-        onDelete={handleDeleteShift}
+        onDelete={handleContextDelete}
         onComplete={handleContextComplete}
         onOps={handleContextOps}
         onColor={handleContextColor}
