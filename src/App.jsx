@@ -353,7 +353,7 @@ const Shift = ({ shift, onContextMenu, onDoubleClick }) => {
     <div
       onContextMenu={(e) => onContextMenu(e, shift)}
       onDoubleClick={() => onDoubleClick(shift)}
-      className="p-2 rounded-md cursor-pointer select-none mb-2 border border-gray-600"
+      className="p-2 rounded-md cursor-pointer select-none mb-2 border border-gray-600 shadow-sm hover:shadow-md transition-shadow"
       style={{
         backgroundColor: effectiveBgColor,
         color: effectiveFontColor,
@@ -391,21 +391,27 @@ const DayColumn = ({ day, shifts, onContextMenu, onDoubleClick }) => {
   }, [shifts]);
 
   return (
-    <div className="flex-1 min-w-[200px] md:min-w-[220px]">
-      <div className="text-center p-3 sticky top-0 bg-black z-10">
+    <div className="flex-1 min-w-[200px] md:min-w-[220px] bg-black border-r border-gray-700">
+      <div className="text-center p-3 sticky top-0 bg-black z-10 border-b border-gray-700">
         <div className="font-bold text-white text-sm">
           {formatDateHeader(day.date)}
         </div>
       </div>
-      <div className="p-2 h-full">
-        {sortedShifts.map((shift) => (
-          <Shift
-            key={shift.id}
-            shift={shift}
-            onContextMenu={onContextMenu}
-            onDoubleClick={onDoubleClick}
-          />
-        ))}
+      <div className="p-2 h-full bg-black min-h-[400px]">
+        {sortedShifts.length === 0 ? (
+          <div className="text-gray-500 text-xs text-center py-4">
+            No shifts
+          </div>
+        ) : (
+          sortedShifts.map((shift) => (
+            <Shift
+              key={shift.id}
+              shift={shift}
+              onContextMenu={onContextMenu}
+              onDoubleClick={onDoubleClick}
+            />
+          ))
+        )}
       </div>
     </div>
   );
@@ -1795,11 +1801,11 @@ const App = () => {
       />
 
       {/* Schedule Board */}
-      <div className="overflow-x-auto pb-4">
+      <div className="overflow-x-auto pb-4 bg-black">
         <div
-          className="grid"
+          className="grid bg-black"
           style={{
-            gridTemplateColumns: "repeat(7, minmax(25vw, 1fr))", // 4 days visible
+            gridTemplateColumns: "repeat(7, minmax(200px, 1fr))",
           }}
         >
           {loading ? (
@@ -1823,22 +1829,22 @@ const App = () => {
                     onDoubleClick={(shift) => handleDoubleClick(day, shift)}
                   />
                   {/* Bottom controls: Add shift and Notes */}
-                  <div className="p-2 flex items-center gap-2">
+                  <div className="p-2 flex items-center gap-2 bg-black border-t border-gray-700">
                     {hasAccess && (
                       <button
                         onClick={() => openAddShiftModal(day)}
                         onContextMenu={(e) => handlePasteMenu(e, day)} // Right-click to paste
-                        className="flex-grow py-2 text-center text-gray-400 font-bold text-lg rounded-md hover:bg-white hover:text-black transition-colors duration-150"
+                        className="flex-grow py-2 text-center text-gray-400 font-bold text-lg rounded-md hover:bg-gray-700 hover:text-white transition-colors duration-150 border border-gray-600"
                       >
                         +
                       </button>
                     )}
                     <button
                       onClick={() => openDayNotesModal(day, day.notes)}
-                      className={`p-2 rounded-md hover:bg-gray-800 ${
+                      className={`p-2 rounded-md hover:bg-gray-700 text-gray-400 hover:text-white ${
                         hasNotes
-                          ? "border border-orange-500"
-                          : "border border-transparent"
+                          ? "border border-orange-500 text-orange-500"
+                          : "border border-gray-600"
                       }`}
                       aria-label="View Day Notes"
                     >
