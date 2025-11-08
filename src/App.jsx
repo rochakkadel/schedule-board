@@ -1326,14 +1326,21 @@ const App = () => {
 
   // Data fetching and real-time listener
   useEffect(() => {
-    // Wait for auth to be ready AND for a user to be signed in (even anon)
-    if (!isAuthReady || !userId) {
-      return;
-    }
-    if (!db) {
+    // If auth is ready but Firebase is not initialized, show error immediately
+    if (isAuthReady && !db) {
       console.error("Firestore is not initialized.");
       setFirebaseError(true);
       setLoading(false);
+      return;
+    }
+    
+    // Wait for auth to be ready AND for a user to be signed in (even anon)
+    if (!isAuthReady || !userId) {
+      // If auth is ready but no userId, and we've waited, stop loading
+      if (isAuthReady && !userId && !auth) {
+        setLoading(false);
+        setFirebaseError(true);
+      }
       return;
     }
 
