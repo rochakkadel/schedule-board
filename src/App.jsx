@@ -10,16 +10,17 @@ import {
   doc,
   getDoc,
   setDoc,
-  updateDoc,
   onSnapshot,
   collection,
   setLogLevel,
+  getDocs,
 } from "firebase/firestore";
 import {
   getAuth,
   signInAnonymously,
   signInWithCustomToken,
   onAuthStateChanged,
+  signOut,
 } from "firebase/auth";
 
 // --- Firebase Configuration ---
@@ -75,11 +76,67 @@ const appId = "default-app-id";
 
 // --- Constants ---
 const ACCESS_CODE = "91965";
-const SITE_NAMES = [
-  "425 California", "101 Mission", "425 Market", "180 Montgomery",
-  "360 Spear", "1019 Market", "@220 Montgomery", "Sutro",
-  "201 Mission", "111 Pine", "501 2nd", "@360 Spear",
-  "420 23rd", "101 Mission", "@350 Spear",
+const DEFAULT_SITE_NAMES = [
+  "Rochak Kadel",
+  "736 Mission St",
+  "600 California St",
+  "120 Kearny St",
+  "1128 Market St",
+  "420 23rd St",
+  "1 La Avanzada St",
+  "500 Howard St",
+  "500 Pine St",
+  "1800 Mission St",
+  "130 Battery St",
+  "1400 Geary Blvd",
+  "300 Kansas St",
+  "633 Folsom St",
+  "501 2nd St",
+  "111 Pine St",
+  "400 Paul Ave",
+  "1 Kearny St",
+  "1200 Van Ness Ave",
+  "181 Fremont St",
+  "274 Brannan St",
+  "360 Spear St",
+  "1035 Market St",
+  "150 Spear St",
+  "750 Battery St",
+  "1635 Divisadero St",
+  "115 Sansome St",
+  "180 Montgomery St",
+  "220 Montgomery St",
+  "601 California St",
+  "711 Eddy St",
+  "1280 Laguna St",
+  "71 Stevenson St",
+  "240 Stockton St",
+  "30 Grant Ave",
+  "170 Maiden Lane",
+  "599 Skyline Blvd",
+  "456 Montgomery St",
+  "717 Market St",
+  "201 Mission St",
+  "101 Mission St",
+  "100 Montgomery St",
+  "166 Geary St",
+  "26 O'Farrell St",
+  "153 Kearny St",
+  "110 Sutter St",
+  "311 California St",
+  "90 New Montgomery St",
+  "785 Market St",
+  "230 California St",
+  "101 Montgomery St",
+  "425 California St",
+  "210 Post St",
+  "30 Maiden Lane",
+  "222 Kearny St",
+  "150 Post St",
+  "1019 Market St",
+   "Sutro Tower",
+  "425 Market St",
+  
 ];
 const FONT_COLORS = ["#000000", "#FFFFFF", "#FF0000"]; // black, white, red
 const FILL_COLORS = ["#FFFFFF", "#008000", "#0000FF", "#000000", "#FFA500"]; // white, green, blue, black, orange
@@ -88,6 +145,98 @@ const COLOR_COMPLETE_BG = "#22C55E"; // Lighter Green
 const COLOR_COMPLETE_FONT = "#FFFFFF"; // White
 const COLOR_OPS_BG = "#3B82F6"; // Lighter Blue
 const COLOR_OPS_FONT = "#FFFFFF"; // White
+const ANALYSIS_URL =
+  "https://xxxrkxxxrkxxx-ui.github.io/Analysis/?reportId=ipyvgB5vn4FqlEOxTgIL";
+const SITE_MANAGER_URL =
+  "https://xxxrkxxxrkxxx-ui.github.io/KadelSiteManager/";
+const SITE_DIRECTORY_DOC_PATH = [
+  "artifacts",
+  appId,
+  "public",
+  "data",
+  "site-directory",
+];
+const REGISTERED_USERS_COLLECTION = `/artifacts/${appId}/public/data/registered-users`;
+
+const formatTimestamp = (isoString) => {
+  if (!isoString) return "--";
+  try {
+    const date = new Date(isoString);
+    return new Intl.DateTimeFormat("en-GB", {
+      year: "numeric",
+      month: "short",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).format(date);
+  } catch (err) {
+    return isoString;
+  }
+};
+
+// --- Shared Styling Helpers ---
+const modalLabelStyle = {
+  display: "block",
+  fontSize: "0.75rem",
+  fontWeight: 600,
+  letterSpacing: "0.04em",
+  textTransform: "uppercase",
+  color: "#94a3b8",
+  marginBottom: "0.35rem",
+};
+
+const modalInputStyle = {
+  width: "100%",
+  padding: "0.65rem 0.75rem",
+  borderRadius: "0.5rem",
+  border: "1px solid rgba(148, 163, 184, 0.35)",
+  backgroundColor: "rgba(15, 23, 42, 0.55)",
+  color: "#f8fafc",
+  fontSize: "0.95rem",
+  outline: "none",
+  boxShadow: "inset 0 0 0 1px rgba(15, 23, 42, 0.35)",
+  transition: "box-shadow 0.15s ease, border 0.15s ease",
+};
+
+const modalPrimaryButtonStyle = {
+  padding: "0.65rem 1.35rem",
+  borderRadius: "0.75rem",
+  border: "none",
+  background: "linear-gradient(135deg, #2563eb, #60a5fa)",
+  color: "#f8fafc",
+  fontWeight: 600,
+  fontSize: "0.95rem",
+  cursor: "pointer",
+  transition: "transform 0.15s ease, box-shadow 0.15s ease",
+};
+
+const modalSecondaryButtonStyle = {
+  padding: "0.65rem 1.2rem",
+  borderRadius: "0.75rem",
+  border: "1px solid rgba(148, 163, 184, 0.35)",
+  backgroundColor: "rgba(15, 23, 42, 0.65)",
+  color: "#e2e8f0",
+  fontWeight: 500,
+  fontSize: "0.95rem",
+  cursor: "pointer",
+  transition: "border 0.15s ease, color 0.15s ease",
+};
+
+const modalTextAreaStyle = {
+  width: "100%",
+  minHeight: "6rem",
+  padding: "0.75rem 0.85rem",
+  borderRadius: "0.75rem",
+  border: "1px solid rgba(148, 163, 184, 0.35)",
+  backgroundColor: "rgba(15, 23, 42, 0.55)",
+  color: "#f8fafc",
+  fontSize: "0.95rem",
+  resize: "vertical",
+  outline: "none",
+  boxShadow: "inset 0 0 0 1px rgba(15, 23, 42, 0.35)",
+  transition: "box-shadow 0.15s ease, border 0.15s ease",
+};
 
 // --- Date Utility Functions ---
 /**
@@ -166,8 +315,6 @@ const useUserAccess = () => {
 
     const initAuth = async () => {
       try {
-        // For a public site, we just sign in anonymously.
-        // __initial_auth_token will not exist.
         await signInAnonymously(auth); // Modular syntax
       } catch (error) {
         console.error("Error during authentication:", error);
@@ -175,20 +322,17 @@ const useUserAccess = () => {
     };
 
     const unsubscribe = onAuthStateChanged(auth, (user) => {
-      // Modular syntax
       setUser(user);
       setIsAuthReady(true);
       if (!user) {
         localStorage.removeItem("scheduleUser");
         setUserInfo(null);
       }
-      // CRITICAL FIX: Re-load userInfo if auth changes and local storage exists
       if (user && user.uid) {
         try {
           const savedUser = localStorage.getItem("scheduleUser");
           if (savedUser) {
             const parsedUser = JSON.parse(savedUser);
-            // Only update if we don't already have userInfo or if it's different
             setUserInfo((current) => current || parsedUser);
           }
         } catch (e) {
@@ -201,16 +345,19 @@ const useUserAccess = () => {
     return () => unsubscribe();
   }, []);
 
-  // Memoized access right
   const hasAccess = useMemo(() => userInfo?.hasAccess === true, [userInfo]);
   const initials = useMemo(() => userInfo?.initials || "??", [userInfo]);
-  const userId = useMemo(() => user?.uid || null, [user]); // Return null if no user
+  const userId = useMemo(() => user?.uid || null, [user]);
 
-  /**
-   * Attempts to sign up and grant access.
-   */
   const signUp = async (firstName, lastName, code) => {
-    if (code.trim() !== ACCESS_CODE) {
+    const trimmedCode = code.trim();
+    const isVip = trimmedCode === "12893";
+    const hasEditAccess =
+      trimmedCode.length === 0
+        ? false
+        : trimmedCode === ACCESS_CODE || isVip;
+
+    if (trimmedCode.length > 0 && !hasEditAccess) {
       return { success: false, error: "Invalid access code." };
     }
     if (!userId) {
@@ -223,21 +370,53 @@ const useUserAccess = () => {
       firstName,
       lastName,
       initials: `${firstInitial}${lastInitial}`.toUpperCase(),
-      hasAccess: true,
+      hasAccess: hasEditAccess,
+      isAdmin: isVip,
       userId: userId,
+      createdAt: new Date().toISOString(),
     };
 
     try {
       localStorage.setItem("scheduleUser", JSON.stringify(newInfo));
-      setUserInfo(newInfo); // Update state to trigger re-render and check `hasAccess`
-      return { success: true, error: null };
+      setUserInfo(newInfo);
+      if (db) {
+        const userDocRef = doc(
+          db,
+          "artifacts",
+          appId,
+          "public",
+          "data",
+          "registered-users",
+          userId
+        );
+        await setDoc(userDocRef, newInfo, { merge: true });
+      }
+      return { success: true, error: null, user: newInfo };
     } catch (e) {
       console.error("Error saving user info:", e);
       return { success: false, error: "Could not save user data." };
     }
   };
 
-  return { user, userId, userInfo, hasAccess, initials, isAuthReady, signUp };
+  const clearUserInfo = useCallback(() => {
+    try {
+      localStorage.removeItem("scheduleUser");
+    } catch (error) {
+      console.error("Error clearing stored user info:", error);
+    }
+    setUserInfo(null);
+  }, []);
+
+  return {
+    user,
+    userId,
+    userInfo,
+    hasAccess,
+    initials,
+    isAuthReady,
+    signUp,
+    clearUserInfo,
+  };
 };
 
 /**
@@ -274,49 +453,328 @@ const Header = ({
   onSignUp,
   userInfo,
   hasAccess,
+  onOpenAnalysis,
+  onOpenSiteManager,
+  showSettings,
+  onOpenSettings,
+  onLogout,
+  onScrollUp,
+  onScrollDown,
 }) => {
+  const [isAvatarMenuOpen, setIsAvatarMenuOpen] = useState(false);
+  const avatarMenuRef = useClickOutside(() => setIsAvatarMenuOpen(false));
+
+  const navButtonStyle = {
+    padding: "0.5rem 0.75rem",
+    backgroundColor: "#1f2937",
+    border: "2px solid #ffffff",
+    color: "#ffffff",
+    borderRadius: "0.375rem",
+    fontWeight: "bold",
+    cursor: "pointer",
+    transition: "background-color 0.15s ease",
+  };
+
+  const verticalButtonStyle = {
+    width: "1.65rem",
+    height: "1.65rem",
+    borderRadius: "0.5rem",
+    border: "1px solid rgba(148,163,184,0.45)",
+    backgroundColor: "rgba(15,23,42,0.65)",
+    color: "#e2e8f0",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    cursor: "pointer",
+    transition: "border 0.15s ease, transform 0.15s ease",
+  };
+
+  const linkButtonStyle = {
+    padding: "0.45rem 0.9rem",
+    borderRadius: "9999px",
+    border: "1px solid rgba(148, 163, 184, 0.45)",
+    backgroundColor: "rgba(15, 23, 42, 0.65)",
+    color: "#e2e8f0",
+    fontSize: "0.82rem",
+    letterSpacing: "0.05em",
+    textTransform: "uppercase",
+    fontWeight: 600,
+    cursor: "pointer",
+    transition: "border 0.15s ease, color 0.15s ease, transform 0.15s ease",
+  };
+
+  const renderNavButton = (label, handler, fontSize) => (
+    <button
+      onClick={handler}
+      style={{ ...navButtonStyle, fontSize: fontSize || "inherit" }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.backgroundColor = "#374151";
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.backgroundColor = "#1f2937";
+      }}
+    >
+      {label}
+    </button>
+  );
+
   return (
-    <header className="mb-4 p-4 bg-black flex flex-col md:flex-row justify-between items-center">
-      {/* Left Side: Navigation */}
-      <div className="flex items-center gap-2">
-        <button
-          onClick={onPrevWeek}
-          className="px-3 py-2 bg-transparent text-white rounded-md hover:bg-gray-800 border border-gray-700"
+    <header
+      className="mb-4 p-4 bg-black border border-white rounded-lg shadow flex flex-col md:flex-row justify-between items-center"
+      style={{
+        marginBottom: "1rem",
+        padding: "1rem",
+        backgroundColor: "#000000",
+        border: "1px solid #ffffff",
+        borderRadius: "0.5rem",
+        display: "flex",
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "center",
+        gap: "1.5rem",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "0.5rem",
+        }}
+      >
+        {renderNavButton("<", onPrevWeek)}
+        {renderNavButton("ts week", onToday, "0.875rem")}
+        {renderNavButton(">", onNextWeek)}
+        {renderNavButton(<CalendarIcon />, onOpenCalendar)}
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: "0.35rem",
+            marginLeft: "0.35rem",
+          }}
         >
-          <ArrowLeftIcon />
+        <button
+            type="button"
+            onClick={onScrollUp}
+            style={{ ...verticalButtonStyle }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.border = "1px solid rgba(96,165,250,0.75)";
+              e.currentTarget.style.transform = "translateY(-1px)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.border = "1px solid rgba(148,163,184,0.45)";
+              e.currentTarget.style.transform = "none";
+            }}
+            aria-label="Scroll up"
+          >
+            <ArrowUpIcon />
         </button>
         <button
-          onClick={onToday}
-          className="px-4 py-2 bg-transparent text-white rounded-md hover:bg-gray-800 text-sm font-medium border border-gray-700"
+            type="button"
+            onClick={onScrollDown}
+            style={{ ...verticalButtonStyle }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.border = "1px solid rgba(96,165,250,0.75)";
+              e.currentTarget.style.transform = "translateY(1px)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.border = "1px solid rgba(148,163,184,0.45)";
+              e.currentTarget.style.transform = "none";
+            }}
+            aria-label="Scroll down"
+          >
+            <ArrowDownIcon />
+        </button>
+        </div>
+      </div>
+
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "0.75rem",
+        }}
+      >
+        <button
+          type="button"
+          onClick={onOpenAnalysis}
+          style={linkButtonStyle}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.border = "1px solid rgba(96, 165, 250, 0.75)";
+            e.currentTarget.style.color = "#bfdbfe";
+            e.currentTarget.style.transform = "translateY(-1px)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.border = "1px solid rgba(148, 163, 184, 0.45)";
+            e.currentTarget.style.color = "#e2e8f0";
+            e.currentTarget.style.transform = "none";
+          }}
         >
-          Today
+          Analysis
         </button>
         <button
-          onClick={onNextWeek}
-          className="px-3 py-2 bg-transparent text-white rounded-md hover:bg-gray-800 border border-gray-700"
+          type="button"
+          onClick={onOpenSiteManager}
+          style={linkButtonStyle}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.border = "1px solid rgba(34, 197, 94, 0.65)";
+            e.currentTarget.style.color = "#86efac";
+            e.currentTarget.style.transform = "translateY(-1px)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.border = "1px solid rgba(148, 163, 184, 0.45)";
+            e.currentTarget.style.color = "#e2e8f0";
+            e.currentTarget.style.transform = "none";
+          }}
         >
-          <ArrowRightIcon />
-        </button>
-        <button
-          onClick={onOpenCalendar}
-          className="px-3 py-2 bg-transparent text-white rounded-md hover:bg-gray-800 border border-gray-700"
-        >
-          <CalendarIcon />
+          Site Manager
         </button>
       </div>
 
-      {/* Right Side: Auth */}
-      <div className="flex items-center gap-4 mt-2 md:mt-0">
-        {hasAccess && userInfo ? (
-          <div className="flex items-center justify-center w-10 h-10 bg-blue-600 text-white rounded-full font-bold">
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "0.9rem",
+        }}
+      >
+        {userInfo ? (
+          <div
+            ref={avatarMenuRef}
+            style={{
+              position: "relative",
+              display: "flex",
+              alignItems: "center",
+              gap: "0.75rem",
+            }}
+          >
+        <button
+              type="button"
+              onClick={() => setIsAvatarMenuOpen((open) => !open)}
+              style={{
+                width: "2.5rem",
+                height: "2.5rem",
+                borderRadius: "50%",
+                border: "2px solid #ffffff",
+                backgroundColor: hasAccess ? "#2563eb" : "rgba(59,130,246,0.45)",
+                color: "#ffffff",
+                fontWeight: "bold",
+                fontSize: "0.95rem",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                cursor: "pointer",
+              }}
+              title={hasAccess ? "Editor Access" : "Viewer Access"}
+            >
             {userInfo.initials}
+        </button>
+            {showSettings && (
+        <button
+                type="button"
+                onClick={onOpenSettings}
+                style={{
+                  width: "2.25rem",
+                  height: "2.25rem",
+                  borderRadius: "9999px",
+                  border: "1px solid rgba(148,163,184,0.45)",
+                  backgroundColor: "rgba(15,23,42,0.65)",
+                  color: "#e2e8f0",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  cursor: "pointer",
+                  transition: "border 0.15s ease, transform 0.15s ease",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.border = "1px solid rgba(96,165,250,0.75)";
+                  e.currentTarget.style.transform = "translateY(-1px)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.border = "1px solid rgba(148,163,184,0.45)";
+                  e.currentTarget.style.transform = "none";
+                }}
+                aria-label="View registered users"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  style={{ width: "1.25rem", height: "1.25rem" }}
+                >
+                  <circle cx="12" cy="12" r="3" />
+                  <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09a1.65 1.65 0 00-1-1.51 1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09a1.65 1.65 0 001.51-1 1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" />
+                </svg>
+              </button>
+            )}
+            {isAvatarMenuOpen && (
+              <div
+                style={{
+                  position: "absolute",
+                  top: "calc(100% + 0.6rem)",
+                  right: showSettings ? "calc(-2.5rem)" : 0,
+                  minWidth: "10rem",
+                  backgroundColor: "rgba(15,23,42,0.96)",
+                  border: "1px solid rgba(148,163,184,0.35)",
+                  borderRadius: "0.75rem",
+                  boxShadow: "0 18px 40px rgba(2, 6, 23, 0.55)",
+                  padding: "0.45rem",
+                  zIndex: 60,
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsAvatarMenuOpen(false);
+                    onLogout();
+                  }}
+                  style={{
+                    width: "100%",
+                    padding: "0.55rem 0.75rem",
+                    borderRadius: "0.6rem",
+                    border: "none",
+                    backgroundColor: "rgba(239,68,68,0.18)",
+                    color: "#fca5a5",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = "rgba(248,113,113,0.25)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = "rgba(239,68,68,0.18)";
+                  }}
+                >
+                  Log Out
+        </button>
+      </div>
+            )}
           </div>
         ) : (
           <button
             onClick={onSignUp}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-500 text-sm font-medium"
+            style={{
+              padding: "0.5rem 1rem",
+              backgroundColor: "",
+              border: "2px solid #ffffff",
+              color: "#ffffff",
+              borderRadius: "0.475rem",
+              fontSize: "0.875rem",
+              fontWeight: "bold",
+              cursor: "pointer",
+            }}
+            onMouseEnter={(e) => {
+              e.target.style.backgroundColor = "blue";
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.backgroundColor = "";
+            }}
           >
-            Sign Up
+            LOGIN
           </button>
         )}
       </div>
@@ -338,46 +796,77 @@ const Shift = ({ shift, onContextMenu, onDoubleClick }) => {
     comments,
   } = shift;
 
-  // Default colors if not specified
   const effectiveBgColor = bgColor || "#FFFFFF";
   const effectiveFontColor = fontColor || "#000000";
+  const normalizedBg = effectiveBgColor.toUpperCase();
+  const isComplete = normalizedBg === COLOR_COMPLETE_BG.toUpperCase();
+  const isOps = normalizedBg === COLOR_OPS_BG.toUpperCase();
+  const displayBackground = isComplete
+    ? COLOR_COMPLETE_BG
+    : isOps
+    ? COLOR_OPS_BG
+    : effectiveBgColor;
+  const displayFont = isComplete || isOps ? "#FFFFFF" : effectiveFontColor;
 
-  // Special case for "@" sites: always red, overrides other font colors
+  const defaultTextColor = site.startsWith("@") ? "#8F2915" : displayFont;
   const siteStyle = {
-    color: site.startsWith("@") ? "#FF0000" : effectiveFontColor,
+    color: defaultTextColor,
   };
 
   const hasComments = comments && comments.length > 0;
 
   return (
     <div
-      onContextMenu={(e) => onContextMenu(e, shift)}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        onContextMenu(e, shift);
+      }}
       onDoubleClick={() => onDoubleClick(shift)}
-      className="p-3 rounded-lg cursor-pointer select-none mb-2 hover:opacity-90 transition-opacity"
+      className="shift-item p-2 rounded-md cursor-pointer select-none mb-2"
       style={{
-        backgroundColor: effectiveBgColor,
-        color: effectiveFontColor,
-        borderRight: hasComments ? "4px solid #FFA500" : "none",
+        padding: "0.65rem",
+        borderRadius: "0.5rem",
+        cursor: "pointer",
+        userSelect: "none",
+        marginBottom: "0.5rem",
+        backgroundColor: displayBackground,
+        color: displayFont,
+        border: "1px solid rgba(148, 163, 184, 0.25)",
+        ...(hasComments && { borderRight: "3px solid #FFA500" }),
+        boxShadow: "0 6px 16px rgba(2, 6, 23, 0.35)",
+        transition: "transform 0.12s ease, box-shadow 0.12s ease",
       }}
     >
-      <div className="flex justify-between items-center">
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          gap: "0.75rem",
+        }}
+      >
         <span
-          className="font-mono font-semibold text-sm"
-          style={siteStyle}
+          className="font-mono font-bold text-sm"
+          style={{
+            ...siteStyle,
+            fontSize: "0.95rem",
+            letterSpacing: "0.04em",
+            fontWeight: 700,
+          }}
         >
           {site} {startTime}-{endTime}
         </span>
-        {initials && (
-          <div 
-            className="ml-2 flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold"
+        <span
+          className="font-mono font-bold text-sm ml-2 flex-shrink-0"
             style={{ 
-              backgroundColor: effectiveFontColor === "#FFFFFF" ? "rgba(0,0,0,0.2)" : "rgba(255,255,255,0.2)",
-              color: effectiveFontColor
+            color: displayFont,
+            marginLeft: "auto",
+            fontWeight: 700,
             }}
           >
             {initials}
-          </div>
-        )}
+        </span>
       </div>
     </div>
   );
@@ -386,7 +875,19 @@ const Shift = ({ shift, onContextMenu, onDoubleClick }) => {
 /**
  * Day Column Component
  */
-const DayColumn = ({ day, shifts, onContextMenu, onDoubleClick }) => {
+const DayColumn = ({
+  day,
+  shifts,
+  onContextMenu,
+  onDoubleClick,
+  hasAccess,
+  onAddShift,
+  onPasteMenu,
+  onDayNotes,
+  hasNotes,
+  boardScrollRef,
+  syncScrollRef,
+}) => {
   const sortedShifts = useMemo(() => {
     return [...shifts].sort((a, b) => {
       const timeA = a.startTime || "0000";
@@ -396,23 +897,150 @@ const DayColumn = ({ day, shifts, onContextMenu, onDoubleClick }) => {
   }, [shifts]);
 
   return (
-    <div className="flex-1 min-w-[200px] md:min-w-[220px] bg-black border-r border-gray-800">
-      <div className="text-center p-3 sticky top-0 bg-black z-10 border-b border-gray-800">
-        <div className="font-semibold text-white text-sm uppercase">
+    <div 
+      className="flex flex-col w-[25vw] min-w-[25vw] flex-shrink-0"
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        width: "25vw",
+        minWidth: "25vw",
+        flexShrink: 0,
+        height: "100%",
+      }}
+    >
+      <div 
+        className="text-center p-3 sticky top-0 bg-black z-10 border-b border-gray-800"
+        style={{
+          textAlign: "center",
+          padding: "0.75rem",
+          position: "sticky",
+          top: 0,
+          backgroundColor: "#000000",
+          zIndex: 10,
+          borderBottom: "1px solid #1f2937",
+        }}
+      >
+        <div 
+          className="font-bold text-white text-sm uppercase"
+          style={{
+            fontWeight: "bold",
+            color: "#ffffff",
+            fontSize: "0.875rem",
+            textTransform: "uppercase",
+          }}
+        >
           {formatDateHeader(day.date)}
         </div>
       </div>
-      <div className="p-3 h-full bg-black min-h-[500px]">
-        {sortedShifts.length === 0 ? null : (
-          sortedShifts.map((shift) => (
+      <div 
+        className="day-column-content hide-scrollbar p-2 flex-1 bg-black min-h-[400px] overflow-y-auto"
+        style={{
+          padding: "0.5rem",
+          flex: 1,
+          backgroundColor: "#000000",
+          minHeight: "400px",
+          overflowY: "auto",
+        }}
+        onScroll={(e) => {
+          const container = boardScrollRef?.current;
+          if (!container) return;
+          const allColumns = container.querySelectorAll('.day-column-content');
+          const currentScroll = e.currentTarget.scrollTop;
+
+          if (syncScrollRef) {
+            if (syncScrollRef.current) {
+              return;
+            }
+            syncScrollRef.current = true;
+          }
+
+          allColumns.forEach(col => {
+            if (col !== e.currentTarget) {
+              col.scrollTop = currentScroll;
+            }
+          });
+
+          if (syncScrollRef) {
+            syncScrollRef.current = false;
+          }
+        }}
+      >
+        {sortedShifts.map((shift) => (
             <Shift
               key={shift.id}
               shift={shift}
               onContextMenu={onContextMenu}
               onDoubleClick={onDoubleClick}
             />
-          ))
+        ))}
+      </div>
+      {/* Bottom controls: Add shift and Notes */}
+      <div 
+        className="p-2 flex items-center gap-2 bg-black border-t border-gray-800"
+        style={{
+          padding: "0.5rem",
+          display: "flex",
+          alignItems: "center",
+          gap: "0.5rem",
+          backgroundColor: "#000000",
+          borderTop: "1px solid #1f2937",
+          marginTop: "auto",
+        }}
+      >
+        {hasAccess && (
+          <button
+            onClick={onAddShift}
+            onContextMenu={onPasteMenu}
+            className="flex-grow py-2 text-center text-gray-400 font-bold text-xl rounded-md hover:bg-white hover:text-black transition-colors duration-150"
+            style={{
+              flexGrow: 1,
+              padding: "0.5rem 0",
+              textAlign: "center",
+              color: "#9ca3af",
+              fontWeight: "bold",
+              fontSize: "1.25rem",
+              borderRadius: "0.375rem",
+              backgroundColor: "transparent",
+              border: "none",
+              cursor: "pointer",
+            }}
+            onMouseEnter={(e) => {
+              e.target.style.backgroundColor = "#ffffff";
+              e.target.style.color = "#000000";
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.backgroundColor = "transparent";
+              e.target.style.color = "#9ca3af";
+            }}
+          >
+            +
+          </button>
         )}
+        <button
+          onClick={onDayNotes}
+          style={{
+            padding: "0.5rem",
+            borderRadius: "0.475rem",
+            backgroundColor: "#1f2937",
+            border: hasNotes ? "2.1px solid #FFBF00" : "0.5px solid #ffffff",
+            color: hasNotes ? "#f97316" : "#ffffff",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+          onMouseEnter={(e) => {
+            e.target.style.backgroundColor = hasNotes
+              ? "rgba(249, 115, 22, 0.12)"
+              : "rgba(255, 255, 255, 0.12)";
+          }}
+          onMouseLeave={(e) => {
+            e.target.style.backgroundColor = "#1f2937";
+          }}
+          aria-label="View  Notes"
+        >
+          <NoteIcon />
+        </button>
       </div>
     </div>
   );
@@ -436,56 +1064,95 @@ const ContextMenu = ({
 
   if (!menuState.visible) return null;
 
+  const groups = [
+    [
+      { label: "✅ Complete", action: onComplete },
+      { label: "⚙️ OPS", action: onOps },
+    ],
+    [
+      { label: "Comment", action: onComment },
+      { label: "Change Colors", action: onColor },
+    ],
+    [
+      { label: "Copy Shift", action: onCopy },
+      { label: "Edit Shift", action: onEdit },
+    ],
+    [
+      {
+        label: "Delete Shift",
+        action: onDelete,
+        danger: true,
+      },
+    ],
+  ];
+
   return (
     <div
       ref={menuRef}
-      className="absolute z-50 w-48 bg-gray-900 border border-white rounded-md shadow-lg"
-      style={{ top: menuState.y, left: menuState.x }}
+      className="context-menu fixed z-50"
+      style={{
+        top: menuState.y,
+        left: menuState.x,
+        position: "fixed",
+        zIndex: 50,
+        minWidth: "13rem",
+        backgroundColor: "rgba(15,23,42,0.95)",
+        border: "1px solid rgba(148,163,184,0.35)",
+        borderRadius: "0.75rem",
+        boxShadow: "0 20px 50px rgba(2, 6, 23, 0.55)",
+        backdropFilter: "blur(18px)",
+        overflow: "hidden",
+      }}
+      onClick={(e) => e.stopPropagation()}
     >
-      <ul className="py-1 text-sm text-gray-200">
-        <li
-          onClick={onComplete}
-          className="px-4 py-2 hover:bg-gray-700 cursor-pointer"
-        >
-          Complete
+      <ul
+        style={{
+          padding: "0.35rem 0",
+          fontSize: "0.92rem",
+          color: "#e2e8f0",
+        }}
+      >
+        {groups.map((group, groupIndex) => (
+          <li key={`group-${groupIndex}`}>
+            {group.map((item) => (
+              <button
+                key={item.label}
+                onClick={() => {
+                  item.action();
+                  onClose();
+                }}
+                style={{
+                  width: "100%",
+                  textAlign: "left",
+                  padding: "0.6rem 1rem",
+                  background: "transparent",
+                  border: "none",
+                  color: item.danger ? "#fca5a5" : "#f8fafc",
+                  cursor: "pointer",
+                  display: "block",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor =
+                    "rgba(59,130,246,0.18)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = "transparent";
+                }}
+              >
+                {item.label}
+              </button>
+            ))}
+            {groupIndex !== groups.length - 1 && (
+              <div
+                style={{
+                  height: "1px",
+                  margin: "0.25rem 0.75rem",
+                  backgroundColor: "rgba(148,163,184,0.25)",
+                }}
+              />
+            )}
         </li>
-        <li
-          onClick={onOps}
-          className="px-4 py-2 hover:bg-gray-700 cursor-pointer"
-        >
-          OPS
-        </li>
-        <li
-          onClick={onComment}
-          className="px-4 py-2 hover:bg-gray-700 cursor-pointer"
-        >
-          Comment
-        </li>
-        <li
-          onClick={onColor}
-          className="px-4 py-2 hover:bg-gray-700 cursor-pointer"
-        >
-          Change Colors
-        </li>
-        <li className="border-t border-gray-700 my-1"></li>
-        <li
-          onClick={onCopy} // New handler
-          className="px-4 py-2 hover:bg-gray-700 cursor-pointer"
-        >
-          Copy Shift
-        </li>
-        <li
-          onClick={onEdit}
-          className="px-4 py-2 hover:bg-gray-700 cursor-pointer"
-        >
-          Edit Shift
-        </li>
-        <li
-          onClick={onDelete}
-          className="px-4 py-2 hover:bg-gray-700 text-red-400 cursor-pointer"
-        >
-          Delete Shift
-        </li>
+        ))}
       </ul>
     </div>
   );
@@ -502,17 +1169,44 @@ const PasteMenu = ({ menuState, onClose, onPaste }) => {
   return (
     <div
       ref={menuRef}
-      className="absolute z-50 w-48 bg-gray-900 border border-white rounded-md shadow-lg"
-      style={{ top: menuState.y, left: menuState.x }}
+      style={{
+        top: menuState.y,
+        left: menuState.x,
+        position: "fixed",
+        zIndex: 50,
+        minWidth: "11rem",
+        backgroundColor: "rgba(15,23,42,0.95)",
+        border: "1px solid rgba(148,163,184,0.35)",
+        borderRadius: "0.75rem",
+        boxShadow: "0 20px 45px rgba(2,6,23,0.45)",
+        overflow: "hidden",
+      }}
+      onClick={(e) => e.stopPropagation()}
     >
-      <ul className="py-1 text-sm text-gray-200">
-        <li
-          onClick={onPaste}
-          className="px-4 py-2 hover:bg-gray-700 cursor-pointer"
+      <button
+        onClick={() => {
+          onPaste();
+          onClose();
+        }}
+        style={{
+          width: "100%",
+          padding: "0.7rem 1rem",
+          textAlign: "left",
+          background: "transparent",
+          border: "none",
+          color: "#f8fafc",
+          fontSize: "0.92rem",
+          cursor: "pointer",
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.backgroundColor = "rgba(34,197,94,0.18)";
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.backgroundColor = "transparent";
+        }}
         >
           Paste Shift
-        </li>
-      </ul>
+      </button>
     </div>
   );
 };
@@ -525,10 +1219,33 @@ const PasteMenu = ({ menuState, onClose, onPaste }) => {
 const Modal = ({ children, onClose }) => {
   const modalRef = useClickOutside(onClose);
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black bg-opacity-75">
+    <div
+      className="fixed inset-0 z-40 flex items-center justify-center bg-black bg-opacity-75"
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 40,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        backgroundColor: "rgba(0, 0, 0, 0.75)",
+        padding: "1rem",
+      }}
+      role="dialog"
+      aria-modal="true"
+    >
       <div
         ref={modalRef}
         className="bg-black border border-white p-6 rounded-lg shadow-xl w-full max-w-md"
+        style={{
+          backgroundColor: "#000000",
+          border: "1px solid #FFFFFF",
+          padding: "1.5rem",
+          borderRadius: "0.75rem",
+          boxShadow: "0 20px 45px rgba(0,0,0,0.45)",
+          width: "100%",
+          maxWidth: "480px",
+        }}
       >
         {children}
       </div>
@@ -560,7 +1277,7 @@ const AddShiftModal = ({
     setSite(value);
     if (value) {
       setSuggestions(
-        SITE_NAMES.filter((name) =>
+        DEFAULT_SITE_NAMES.filter((name) =>
           name.toLowerCase().includes(value.toLowerCase())
         )
       );
@@ -609,82 +1326,187 @@ const AddShiftModal = ({
 
   return (
     <Modal onClose={onClose}>
-      <h3 className="text-xl font-semibold text-white mb-4">Add New Shift</h3>
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="relative" ref={suggestionRef}>
-          <label className="block text-sm font-medium text-gray-200 mb-1">
-            Site Name
-          </label>
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: "1.5rem",
+        }}
+      >
+        <div>
+          <h3
+            style={{
+              fontSize: "1.35rem",
+              fontWeight: 700,
+              color: "#f8fafc",
+              marginBottom: "0.35rem",
+            }}
+          >
+            Add New Shift
+          </h3>
+          <p
+            style={{
+              fontSize: "0.9rem",
+              color: "#94a3b8",
+              margin: 0,
+            }}
+          >
+
+          </p>
+        </div>
+
+        <form
+          onSubmit={handleSubmit}
+          style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}
+        >
+          <div className="relative" ref={suggestionRef} style={{ position: "relative" }}>
+            <label style={modalLabelStyle}>Site Name</label>
           <input
             type="text"
-            placeholder="Start typing to search..."
+              placeholder="Start typing…"
             value={site}
             onChange={handleSiteChange}
             onFocus={() => setIsFocused(true)}
-            className="w-full p-2 bg-black border border-gray-400 text-white rounded-md text-sm"
+              style={{
+                ...modalInputStyle,
+                boxShadow: isFocused
+                  ? "0 0 0 2px rgba(96, 165, 250, 0.45)"
+                  : modalInputStyle.boxShadow,
+              }}
           />
           {isFocused && suggestions.length > 0 && (
-            <div className="absolute z-10 w-full bg-black border border-white rounded-md shadow-lg max-h-48 overflow-y-auto">
-              {suggestions.map((suggestion, index) => (
-                <div
-                  key={`${suggestion}-${index}`}
+              <div
+                style={{
+                  position: "absolute",
+                  inset: "calc(100% + 0.5rem) 0 auto 0",
+                  backgroundColor: "rgba(15, 23, 42, 0.9)",
+                  borderRadius: "0.75rem",
+                  border: "1px solid rgba(148, 163, 184, 0.25)",
+                  maxHeight: "12rem",
+                  overflowY: "auto",
+                  boxShadow: "0 18px 40px rgba(2, 6, 23, 0.45)",
+                  backdropFilter: "blur(18px)",
+                  zIndex: 20,
+                }}
+              >
+                {suggestions.map((suggestion) => (
+                  <button
+                    key={suggestion}
+                    type="button"
                   onMouseDown={(e) => {
-                    e.stopPropagation(); // Prevent click from closing modal
+                      e.preventDefault();
+                      e.stopPropagation();
                     selectSuggestion(suggestion);
                   }}
-                  className="p-2 text-sm text-gray-200 hover:bg-gray-800 cursor-pointer"
+                    style={{
+                      width: "100%",
+                      textAlign: "left",
+                      padding: "0.7rem 0.9rem",
+                      background: "transparent",
+                      border: "none",
+                      color: "#e2e8f0",
+                      fontSize: "0.95rem",
+                      cursor: "pointer",
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = "rgba(59, 130, 246, 0.15)";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = "transparent";
+                    }}
                 >
                   {suggestion}
-                </div>
+                  </button>
               ))}
             </div>
           )}
         </div>
-        <div className="flex gap-4">
-          <div className="w-1/2">
-            <label className="block text-sm font-medium text-gray-200 mb-1">
-              Start (HHMM)
-            </label>
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+              gap: "1rem",
+            }}
+          >
+            <div>
+              <label style={modalLabelStyle}>Start </label>
             <input
               type="text"
-              placeholder="HHMM"
+                placeholder="0000"
               value={startTime}
               onChange={(e) => setStartTime(e.target.value)}
               maxLength="4"
-              className="w-full p-2 bg-black border border-gray-400 text-white rounded-md text-sm font-mono"
+                style={{ ...modalInputStyle, fontFamily: "monospace", letterSpacing: "0.08em" }}
             />
           </div>
-          <div className="w-1/2">
-            <label className="block text-sm font-medium text-gray-200 mb-1">
-              End (HHMM)
-            </label>
+            <div>
+              <label style={modalLabelStyle}>End </label>
             <input
               type="text"
-              placeholder="HHMM"
+                placeholder="0000"
               value={endTime}
               onChange={(e) => setEndTime(e.target.value)}
               maxLength="4"
-              className="w-full p-2 bg-black border border-gray-400 text-white rounded-md text-sm font-mono"
+                style={{ ...modalInputStyle, fontFamily: "monospace", letterSpacing: "0.08em" }}
             />
           </div>
         </div>
-        {error && <p className="text-red-400 text-sm">{error}</p>}
-        <div className="flex justify-end gap-3 pt-4">
+
+          {error && (
+            <div
+              style={{
+                padding: "0.75rem",
+                borderRadius: "0.75rem",
+                backgroundColor: "rgba(239, 68, 68, 0.15)",
+                color: "#fca5a5",
+                fontSize: "0.85rem",
+              }}
+            >
+              {error}
+            </div>
+          )}
+
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "flex-end",
+              gap: "0.75rem",
+              marginTop: "0.5rem",
+            }}
+          >
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 bg-gray-700 text-white rounded-md hover:bg-gray-600 text-sm font-medium"
+              style={modalSecondaryButtonStyle}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.border = "1px solid rgba(148, 163, 184, 0.55)";
+                e.currentTarget.style.color = "#f8fafc";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.border = "1px solid rgba(148, 163, 184, 0.35)";
+                e.currentTarget.style.color = "#e2e8f0";
+              }}
           >
             Cancel
           </button>
           <button
             type="submit"
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-500 text-sm font-medium"
+              style={modalPrimaryButtonStyle}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = "translateY(-1px)";
+                e.currentTarget.style.boxShadow = "0 12px 24px rgba(37, 99, 235, 0.25)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = "none";
+                e.currentTarget.style.boxShadow = "none";
+              }}
           >
             Add Shift
           </button>
         </div>
       </form>
+      </div>
     </Modal>
   );
 };
@@ -724,74 +1546,141 @@ const EditShiftModal = ({ shift, day, weekId, onClose, onUpdateShift }) => {
 
   return (
     <Modal onClose={onClose}>
-      <h3 className="text-xl font-semibold text-white mb-4">Edit Shift</h3>
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: "1.5rem",
+        }}
+      >
         <div>
-          <label className="block text-sm font-medium text-gray-200 mb-1">
-            Site Name
-          </label>
+          <h3
+            style={{
+              fontSize: "1.35rem",
+              fontWeight: 700,
+              color: "#f8fafc",
+              marginBottom: "0.35rem",
+            }}
+          >
+            Edit Shift
+          </h3>
+          <p
+            style={{
+              fontSize: "0.9rem",
+              color: "#94a3b8",
+              margin: 0,
+            }}
+          >
+
+          </p>
+        </div>
+
+        <form
+          onSubmit={handleSubmit}
+          style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}
+        >
+          <div>
+            <label style={modalLabelStyle}>Site Name</label>
           <input
             type="text"
             value={site}
             onChange={(e) => setSite(e.target.value)}
-            className="w-full p-2 bg-black border border-gray-400 text-white rounded-md text-sm"
+              style={modalInputStyle}
           />
         </div>
-        <div className="flex gap-4">
-          <div className="w-1/2">
-            <label className="block text-sm font-medium text-gray-200 mb-1">
-              Start (HHMM)
-            </label>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+              gap: "1rem",
+            }}
+          >
+            <div>
+              <label style={modalLabelStyle}>Start (HHMM)</label>
             <input
               type="text"
               value={startTime}
               onChange={(e) => setStartTime(e.target.value)}
               maxLength="4"
-              className="w-full p-2 bg-black border border-gray-400 text-white rounded-md text-sm font-mono"
+                style={{ ...modalInputStyle, fontFamily: "monospace", letterSpacing: "0.08em" }}
             />
           </div>
-          <div className="w-1/2">
-            <label className="block text-sm font-medium text-gray-200 mb-1">
-              End (HHMM)
-            </label>
+            <div>
+              <label style={modalLabelStyle}>End (HHMM)</label>
             <input
               type="text"
               value={endTime}
               onChange={(e) => setEndTime(e.target.value)}
               maxLength="4"
-              className="w-full p-2 bg-black border border-gray-400 text-white rounded-md text-sm font-mono"
+                style={{ ...modalInputStyle, fontFamily: "monospace", letterSpacing: "0.08em" }}
             />
           </div>
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-200 mb-1">
-            Initials (Optional)
-          </label>
+            <label style={modalLabelStyle}>Initials (Optional)</label>
           <input
             type="text"
             value={initials}
             onChange={(e) => setInitials(e.target.value)}
             maxLength="4"
-            className="w-full p-2 bg-black border border-gray-400 text-white rounded-md text-sm font-mono"
+              style={{ ...modalInputStyle, fontFamily: "monospace", letterSpacing: "0.12em" }}
           />
         </div>
-        {error && <p className="text-red-400 text-sm">{error}</p>}
-        <div className="flex justify-end gap-3 pt-4">
+
+          {error && (
+            <div
+              style={{
+                padding: "0.75rem",
+                borderRadius: "0.75rem",
+                backgroundColor: "rgba(239, 68, 68, 0.15)",
+                color: "#fca5a5",
+                fontSize: "0.85rem",
+              }}
+            >
+              {error}
+            </div>
+          )}
+
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "flex-end",
+              gap: "0.75rem",
+              marginTop: "0.5rem",
+            }}
+          >
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 bg-gray-700 text-white rounded-md hover:bg-gray-600 text-sm font-medium"
+              style={modalSecondaryButtonStyle}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.border = "1px solid rgba(148, 163, 184, 0.55)";
+                e.currentTarget.style.color = "#f8fafc";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.border = "1px solid rgba(148, 163, 184, 0.35)";
+                e.currentTarget.style.color = "#e2e8f0";
+              }}
           >
             Cancel
           </button>
           <button
             type="submit"
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-500 text-sm font-medium"
+              style={modalPrimaryButtonStyle}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = "translateY(-1px)";
+                e.currentTarget.style.boxShadow = "0 12px 24px rgba(37, 99, 235, 0.25)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = "none";
+                e.currentTarget.style.boxShadow = "none";
+              }}
           >
             Save Changes
           </button>
         </div>
       </form>
+      </div>
     </Modal>
   );
 };
@@ -814,30 +1703,65 @@ const ColorModal = ({ shift, day, onClose, onUpdateShift }) => {
   };
 
   const ColorSelector = ({ title, colors, selected, onChange }) => (
-    <div>
-      <label className="block text-sm font-medium text-gray-200 mb-2">
-        {title}
-      </label>
-      <div className="flex gap-2">
-        {colors.map((color) => (
+    <div style={{ display: "flex", flexDirection: "column", gap: "0.65rem" }}>
+      <span style={{ ...modalLabelStyle, marginBottom: 0 }}>{title}</span>
+      <div style={{ display: "flex", gap: "0.6rem", flexWrap: "wrap" }}>
+        {colors.map((color) => {
+          const isSelected = selected === color;
+          return (
           <button
             key={color}
             type="button"
             onClick={() => onChange(color)}
-            className={`w-8 h-8 rounded-full border-2 ${
-              selected === color ? "border-white" : "border-gray-600"
-            }`}
-            style={{ backgroundColor: color }}
-          ></button>
-        ))}
+              style={{
+                width: "2.4rem",
+                height: "2.4rem",
+                borderRadius: "0.75rem",
+                border: isSelected ? "2px solid #f8fafc" : "1px solid rgba(148,163,184,0.35)",
+                backgroundColor: color,
+                cursor: "pointer",
+                boxShadow: isSelected ? "0 0 0 4px rgba(37, 99, 235, 0.35)" : "none",
+                transition: "transform 0.15s ease, border 0.15s ease, box-shadow 0.15s ease",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = "translateY(-2px)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = "none";
+              }}
+            />
+          );
+        })}
       </div>
     </div>
   );
 
   return (
     <Modal onClose={onClose}>
-      <h3 className="text-xl font-semibold text-white mb-4">Change Colors</h3>
-      <div className="space-y-4">
+      <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+        <div>
+          <h3
+            style={{
+              fontSize: "1.35rem",
+              fontWeight: 700,
+              color: "#f8fafc",
+              marginBottom: "0.35rem",
+            }}
+          >
+            Shift Colors
+          </h3>
+          <p
+            style={{
+              fontSize: "0.9rem",
+              color: "#94a3b8",
+              margin: 0,
+            }}
+          >
+            Personalize how this shift appears on the board. Preview updates in real time.
+          </p>
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: "1.3rem" }}>
         <ColorSelector
           title="Font Color"
           colors={FONT_COLORS}
@@ -850,30 +1774,96 @@ const ColorModal = ({ shift, day, onClose, onUpdateShift }) => {
           selected={bgColor}
           onChange={setBgColor}
         />
-        <div className="mt-6 p-2 rounded-md" style={{ backgroundColor: bgColor }}>
+        </div>
+
+        <div
+          style={{
+            marginTop: "0.25rem",
+            padding: "1rem",
+            borderRadius: "1rem",
+            border: "1px solid rgba(148, 163, 184, 0.15)",
+            backgroundColor: "rgba(15, 23, 42, 0.55)",
+            display: "flex",
+            flexDirection: "column",
+            gap: "0.5rem",
+          }}
+        >
+          <span style={{ fontSize: "0.8rem", color: "#94a3b8", textTransform: "uppercase" }}>
+            Preview
+          </span>
+          <div
+            style={{
+              padding: "0.85rem 1rem",
+              borderRadius: "0.75rem",
+              border: "1px solid rgba(148,163,184,0.25)",
+              backgroundColor: bgColor,
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+            }}
+          >
           <span
-            className="font-mono font-bold text-sm"
-            style={{ color: fontColor }}
+              style={{
+                fontFamily: "monospace",
+                fontWeight: 700,
+                fontSize: "0.95rem",
+                color: fontColor,
+              }}
           >
             {shift.site} {shift.startTime}-{shift.endTime}
           </span>
+            <span
+              style={{
+                fontFamily: "monospace",
+                fontWeight: 700,
+                fontSize: "0.95rem",
+                color: fontColor,
+              }}
+            >
+              {shift.initials || "??"}
+          </span>
         </div>
       </div>
-      <div className="flex justify-end gap-3 pt-6">
+
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "flex-end",
+            gap: "0.75rem",
+            paddingTop: "0.5rem",
+          }}
+        >
         <button
           type="button"
           onClick={onClose}
-          className="px-4 py-2 bg-gray-700 text-white rounded-md hover:bg-gray-600 text-sm font-medium"
+            style={modalSecondaryButtonStyle}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.border = "1px solid rgba(148, 163, 184, 0.55)";
+              e.currentTarget.style.color = "#f8fafc";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.border = "1px solid rgba(148, 163, 184, 0.35)";
+              e.currentTarget.style.color = "#e2e8f0";
+            }}
         >
           Cancel
         </button>
         <button
           type="button"
           onClick={handleSave}
-          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-500 text-sm font-medium"
+            style={modalPrimaryButtonStyle}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = "translateY(-1px)";
+              e.currentTarget.style.boxShadow = "0 12px 24px rgba(37, 99, 235, 0.25)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = "none";
+              e.currentTarget.style.boxShadow = "none";
+            }}
         >
           Save Colors
         </button>
+        </div>
       </div>
     </Modal>
   );
@@ -885,22 +1875,32 @@ const ColorModal = ({ shift, day, onClose, onUpdateShift }) => {
 const CalendarModal = ({ currentDate, onClose, onDateSelect }) => {
   const [displayDate, setDisplayDate] = useState(new Date(currentDate));
 
-  const startOfMonth = new Date(
-    displayDate.getFullYear(),
-    displayDate.getMonth(),
-    1
-  );
-  const endOfMonth = new Date(
-    displayDate.getFullYear(),
-    displayDate.getMonth() + 1,
-    0
+  const startOfMonth = useMemo(
+    () => new Date(displayDate.getFullYear(), displayDate.getMonth(), 1),
+    [displayDate]
   );
 
-  const startDay = startOfMonth.getDay();
-  const totalDays = endOfMonth.getDate();
+  const startOfGrid = useMemo(() => {
+    const start = new Date(startOfMonth);
+    const day = start.getDay();
+    start.setDate(start.getDate() - day); // back to Sunday
+    return start;
+  }, [startOfMonth]);
 
-  const blanks = Array(startDay).fill(null);
-  const daysInMonth = Array.from({ length: totalDays }, (_, i) => i + 1);
+  const gridDays = useMemo(() => {
+    return Array.from({ length: 42 }, (_, index) => {
+      const day = new Date(startOfGrid);
+      day.setDate(startOfGrid.getDate() + index);
+      return day;
+    });
+  }, [startOfGrid]);
+
+  const isSameDay = (a, b) =>
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate();
+
+  const today = new Date();
 
   const changeMonth = (delta) => {
     setDisplayDate(
@@ -908,61 +1908,132 @@ const CalendarModal = ({ currentDate, onClose, onDateSelect }) => {
     );
   };
 
-  const handleDayClick = (day) => {
-    const selected = new Date(
-      displayDate.getFullYear(),
-      displayDate.getMonth(),
-      day
-    );
-    onDateSelect(selected);
+  const handleDayClick = (date) => {
+    onDateSelect(date);
     onClose();
   };
 
   return (
     <Modal onClose={onClose}>
-      <div className="w-full">
-        <div className="flex justify-between items-center mb-4">
+      <div style={{ width: "100%", maxWidth: "24rem", color: "#f8fafc" }}>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginBottom: "1.25rem",
+          }}
+        >
           <button
             onClick={() => changeMonth(-1)}
-            className="p-2 text-white hover:bg-gray-700 rounded-full"
+            style={{
+              width: "2.25rem",
+              height: "2.25rem",
+              borderRadius: "9999px",
+              border: "1px solid rgba(148, 163, 184, 0.35)",
+              background: "rgba(15, 23, 42, 0.65)",
+              color: "#e2e8f0",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              cursor: "pointer",
+            }}
           >
             <ArrowLeftIcon />
           </button>
-          <h4 className="text-lg font-semibold text-white">
+          <div style={{ textAlign: "center" }}>
+            <h4
+              style={{
+                fontSize: "1.2rem",
+                fontWeight: 600,
+                margin: 0,
+              }}
+            >
             {displayDate.toLocaleString("default", {
               month: "long",
               year: "numeric",
             })}
           </h4>
+          </div>
           <button
             onClick={() => changeMonth(1)}
-            className="p-2 text-white hover:bg-gray-700 rounded-full"
+            style={{
+              width: "2.25rem",
+              height: "2.25rem",
+              borderRadius: "9999px",
+              border: "1px solid rgba(148, 163, 184, 0.35)",
+              background: "rgba(15, 23, 42, 0.65)",
+              color: "#e2e8f0",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              cursor: "pointer",
+            }}
           >
             <ArrowRightIcon />
           </button>
         </div>
-        <div className="grid grid-cols-7 gap-1 text-center text-sm text-gray-400 mb-2">
-          <span>S</span>
-          <span>M</span>
-          <span>T</span>
-          <span>W</span>
-          <span>T</span>
-          <span>F</span>
-          <span>S</span>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(7, minmax(0, 1fr))",
+            textAlign: "center",
+            fontSize: "0.75rem",
+            letterSpacing: "0.08em",
+            textTransform: "uppercase",
+            color: "#94a3b8",
+            marginBottom: "0.75rem",
+          }}
+        >
+          {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
+            <span key={day}>{day}</span>
+          ))}
         </div>
-        <div className="grid grid-cols-7 gap-1">
-          {blanks.map((_, i) => (
-            <div key={`blank-${i}`}></div>
-          ))}
-          {daysInMonth.map((day) => (
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(7, minmax(0, 1fr))",
+            gap: "0.4rem",
+          }}
+        >
+          {gridDays.map((day) => {
+            const inMonth = day.getMonth() === displayDate.getMonth();
+            const isToday = isSameDay(day, today);
+            const isSelected = isSameDay(day, currentDate);
+
+            return (
             <button
-              key={day}
+                key={day.toISOString()}
               onClick={() => handleDayClick(day)}
-              className="p-2 text-center text-white rounded-full hover:bg-blue-600"
+                style={{
+                  padding: "0.55rem 0.35rem",
+                  borderRadius: "0.9rem",
+                  border: isSelected
+                    ? "1px solid rgba(37, 99, 235, 0.65)"
+                    : "1px solid transparent",
+                  background: isSelected
+                    ? "linear-gradient(135deg, rgba(37, 99, 235, 0.95), rgba(30, 64, 175, 0.85))"
+                    : isToday
+                    ? "rgba(59, 130, 246, 0.18)"
+                    : "rgba(15, 23, 42, 0.55)",
+                  color: inMonth ? "#f8fafc" : "rgba(148, 163, 184, 0.55)",
+                  fontWeight: inMonth ? 600 : 400,
+                  cursor: "pointer",
+                  transition: "transform 0.15s ease, box-shadow 0.15s ease",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = "translateY(-2px)";
+                  e.currentTarget.style.boxShadow = "0 12px 18px rgba(2, 6, 23, 0.35)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = "none";
+                  e.currentTarget.style.boxShadow = "none";
+                }}
             >
-              {day}
+                {day.getDate()}
             </button>
-          ))}
+            );
+          })}
         </div>
       </div>
     </Modal>
@@ -981,72 +2052,153 @@ const SignUpModal = ({ onClose, onSignUp }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
-    if (!firstName || !lastName || !accessCode) {
-      setError("All fields are required.");
+    if (!firstName.trim() || !lastName.trim()) {
+      setError("First and last name are required.");
       return;
     }
-    const result = await onSignUp(firstName, lastName, accessCode);
+    const result = await onSignUp(firstName.trim(), lastName.trim(), accessCode);
     if (result.success) {
       onClose();
-    } else {
+    } else if (result.error) {
       setError(result.error);
     }
   };
 
   return (
     <Modal onClose={onClose}>
-      <h3 className="text-xl font-semibold text-white mb-4">Create Account</h3>
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: "1.5rem",
+        }}
+      >
         <div>
-          <label className="block text-sm font-medium text-gray-200 mb-1">
-            First Name
-          </label>
+          <h3
+            style={{
+              fontSize: "1.4rem",
+              fontWeight: 700,
+              color: "#f8fafc",
+              marginBottom: "0.35rem",
+            }}
+          >
+            Create Your Account
+          </h3>
+          <p
+            style={{
+              fontSize: "0.9rem",
+              color: "#94a3b8",
+              margin: 0,
+            }}
+          >
+
+          </p>
+        </div>
+
+        <form
+          onSubmit={handleSubmit}
+          style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}
+        >
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+              gap: "1rem",
+            }}
+          >
+            <div>
+              <label style={modalLabelStyle}>First Name</label>
           <input
             type="text"
             value={firstName}
             onChange={(e) => setFirstName(e.target.value)}
-            className="w-full p-2 bg-black border border-gray-400 text-white rounded-md text-sm"
+                style={modalInputStyle}
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-200 mb-1">
-            Last Name
-          </label>
+              <label style={modalLabelStyle}>Last Name</label>
           <input
             type="text"
             value={lastName}
             onChange={(e) => setLastName(e.target.value)}
-            className="w-full p-2 bg-black border border-gray-400 text-white rounded-md text-sm"
+                style={modalInputStyle}
           />
+            </div>
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-200 mb-1">
-            Access Code
-          </label>
+            <label style={modalLabelStyle}>Acces Code</label>
           <input
             type="password"
             value={accessCode}
             onChange={(e) => setAccessCode(e.target.value)}
-            className="w-full p-2 bg-black border border-gray-400 text-white rounded-md text-sm"
+              style={modalInputStyle}
+              placeholder="OPTIONAL, ADMIN ACCES"
           />
+            <p
+              style={{
+                marginTop: "0.35rem",
+                fontSize: "0.75rem",
+                color: "#64748b",
+              }}
+            >
+
+            </p>
         </div>
-        {error && <p className="text-red-400 text-sm">{error}</p>}
-        <div className="flex justify-end gap-3 pt-4">
+
+          {error && (
+            <div
+              style={{
+                padding: "0.75rem",
+                borderRadius: "0.75rem",
+                backgroundColor: "rgba(239, 68, 68, 0.15)",
+                color: "#fca5a5",
+                fontSize: "0.85rem",
+              }}
+            >
+              {error}
+            </div>
+          )}
+
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "flex-end",
+              gap: "0.75rem",
+              marginTop: "0.5rem",
+            }}
+          >
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 bg-gray-700 text-white rounded-md hover:bg-gray-600 text-sm font-medium"
+              style={modalSecondaryButtonStyle}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.border = "1px solid rgba(148, 163, 184, 0.55)";
+                e.currentTarget.style.color = "#f8fafc";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.border = "1px solid rgba(148, 163, 184, 0.35)";
+                e.currentTarget.style.color = "#e2e8f0";
+              }}
           >
             Cancel
           </button>
           <button
             type="submit"
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-500 text-sm font-medium"
+              style={modalPrimaryButtonStyle}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = "translateY(-1px)";
+                e.currentTarget.style.boxShadow = "0 12px 24px rgba(37, 99, 235, 0.25)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = "none";
+                e.currentTarget.style.boxShadow = "none";
+              }}
           >
             Sign Up
           </button>
         </div>
       </form>
+      </div>
     </Modal>
   );
 };
@@ -1094,23 +2246,91 @@ const CommentModal = ({
 
   return (
     <Modal onClose={onClose}>
-      <h3 className="text-xl font-semibold text-white mb-4">
-        Comments for {shift.site}
+      <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+        <div>
+          <h3
+            style={{
+              fontSize: "1.35rem",
+              fontWeight: 700,
+              color: "#f8fafc",
+              marginBottom: "0.2rem",
+            }}
+          >
+            Comments · {shift.site}
       </h3>
-      <div className="space-y-4">
-        <div className="max-h-64 overflow-y-auto space-y-3 bg-gray-900 p-3 rounded-md border border-gray-700">
-          {comments.length > 0 &&
-            comments.map((comment) => (
-              <div key={comment.id} className="text-sm">
-                <div className="flex justify-between items-center">
-                  <span className="font-semibold text-blue-400">
+          <p
+            style={{
+              fontSize: "0.9rem",
+              color: "#94a3b8",
+              margin: 0,
+            }}
+          >
+            
+          </p>
+        </div>
+
+        <div
+          style={{
+            maxHeight: "16rem",
+            overflowY: "auto",
+            display: "flex",
+            flexDirection: "column",
+            gap: "0.9rem",
+            padding: "1rem",
+            background: "linear-gradient(180deg, rgba(15,23,42,0.75), rgba(15,23,42,0.35))",
+            borderRadius: "1rem",
+            border: "1px solid rgba(148, 163, 184, 0.18)",
+            boxShadow: "inset 0 0 0 1px rgba(15, 23, 42, 0.35)",
+          }}
+        >
+          {comments.length === 0 && (
+            <div
+              style={{
+                textAlign: "center",
+                color: "rgba(148, 163, 184, 0.8)",
+                fontSize: "0.9rem",
+              }}
+            >
+                
+            </div>
+          )}
+          {comments.map((comment) => (
+            <div
+              key={comment.id}
+              style={{
+                backgroundColor: "rgba(30, 64, 175, 0.18)",
+                border: "1px solid rgba(96, 165, 250, 0.25)",
+                borderRadius: "0.9rem",
+                padding: "0.75rem 0.9rem",
+                color: "#e2e8f0",
+                display: "flex",
+                flexDirection: "column",
+                gap: "0.3rem",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  gap: "0.5rem",
+                }}
+              >
+                <span style={{ fontWeight: 600, color: "#60a5fa", fontSize: "0.9rem" }}>
                     {comment.user}
                   </span>
-                  <span className="text-xs text-gray-500">
-                    {new Date(comment.date).toLocaleString()}
+                <span style={{ fontSize: "0.75rem", color: "#94a3b8" }}>
+                  {formatTimestamp(comment.date)}
                   </span>
                 </div>
-                <p className="text-gray-200 whitespace-pre-wrap">
+              <p
+                style={{
+                  whiteSpace: "pre-wrap",
+                  fontSize: "0.92rem",
+                  margin: 0,
+                  color: "#f8fafc",
+                }}
+              >
                   {comment.text}
                 </p>
               </div>
@@ -1118,30 +2338,55 @@ const CommentModal = ({
           <div ref={commentsEndRef} />
         </div>
 
-        {hasAccess && (
-          <form onSubmit={handleSubmit} className="flex flex-col gap-2">
+        {hasAccess ? (
+          <form
+            onSubmit={handleSubmit}
+            style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}
+          >
             <textarea
               rows="3"
               value={newComment}
               onChange={(e) => setNewComment(e.target.value)}
-              placeholder="Add your comment..."
-              className="w-full p-2 bg-black border border-gray-400 text-white rounded-md text-sm"
+              placeholder="Type your comment…"
+              style={modalTextAreaStyle}
+              onFocus={(e) => {
+                e.currentTarget.style.boxShadow = "0 0 0 2px rgba(96, 165, 250, 0.35)";
+              }}
+              onBlur={(e) => {
+                e.currentTarget.style.boxShadow = "inset 0 0 0 1px rgba(15, 23, 42, 0.35)";
+              }}
             ></textarea>
+            <div style={{ display: "flex", justifyContent: "flex-end" }}>
             <button
               type="submit"
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-500 text-sm font-medium self-end"
+                style={modalPrimaryButtonStyle}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = "translateY(-1px)";
+                  e.currentTarget.style.boxShadow = "0 12px 24px rgba(37, 99, 235, 0.25)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = "none";
+                  e.currentTarget.style.boxShadow = "none";
+                }}
             >
               Add Comment
             </button>
+            </div>
           </form>
-        )}
-
-        {!hasAccess && (
-          <div className="flex justify-end">
+        ) : (
+          <div style={{ display: "flex", justifyContent: "flex-end" }}>
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 bg-gray-700 text-white rounded-md hover:bg-gray-600 text-sm font-medium"
+              style={modalSecondaryButtonStyle}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.border = "1px solid rgba(148, 163, 184, 0.55)";
+                e.currentTarget.style.color = "#f8fafc";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.border = "1px solid rgba(148, 163, 184, 0.35)";
+                e.currentTarget.style.color = "#e2e8f0";
+              }}
             >
               Close
             </button>
@@ -1190,23 +2435,91 @@ const DayNotesModal = ({
 
   return (
     <Modal onClose={onClose}>
-      <h3 className="text-xl font-semibold text-white mb-4">
-        Notes for {formatDateHeader(day.date)}
+      <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+        <div>
+          <h3
+            style={{
+              fontSize: "1.35rem",
+              fontWeight: 700,
+              color: "#f8fafc",
+              marginBottom: "0.2rem",
+            }}
+          >
+             Notes · {formatDateHeader(day.date)}
       </h3>
-      <div className="space-y-4">
-        <div className="max-h-64 overflow-y-auto space-y-3 bg-gray-900 p-3 rounded-md border border-gray-700">
-          {dayNotes.length > 0 &&
-            dayNotes.map((note) => (
-              <div key={note.id} className="text-sm">
-                <div className="flex justify-between items-center">
-                  <span className="font-semibold text-blue-400">
+          <p
+            style={{
+              fontSize: "0.9rem",
+              color: "#94a3b8",
+              margin: 0,
+            }}
+          >
+
+          </p>
+        </div>
+
+        <div
+          style={{
+            maxHeight: "16rem",
+            overflowY: "auto",
+            display: "flex",
+            flexDirection: "column",
+            gap: "0.9rem",
+            padding: "1rem",
+            background: "linear-gradient(180deg, rgba(6,78,59,0.55), rgba(6,78,59,0.25))",
+            borderRadius: "1rem",
+            border: "1px solid rgba(74, 222, 128, 0.25)",
+            boxShadow: "inset 0 0 0 1px rgba(15, 23, 42, 0.35)",
+          }}
+        >
+          {dayNotes.length === 0 && (
+            <div
+              style={{
+                textAlign: "center",
+                color: "rgba(148, 163, 184, 0.85)",
+                fontSize: "0.9rem",
+              }}
+            >
+              No notes recorded yet.
+            </div>
+          )}
+          {dayNotes.map((note) => (
+            <div
+              key={note.id}
+              style={{
+                backgroundColor: "rgba(22, 163, 74, 0.18)",
+                border: "1px solid rgba(74, 222, 128, 0.25)",
+                borderRadius: "0.9rem",
+                padding: "0.75rem 0.9rem",
+                color: "#e2e8f0",
+                display: "flex",
+                flexDirection: "column",
+                gap: "0.3rem",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  gap: "0.5rem",
+                }}
+              >
+                <span style={{ fontWeight: 600, color: "#4ade80", fontSize: "0.9rem" }}>
                     {note.user}
                   </span>
-                  <span className="text-xs text-gray-500">
-                    {new Date(note.date).toLocaleString()}
+                <span style={{ fontSize: "0.75rem", color: "#a7f3d0" }}>
+                  {formatTimestamp(note.date)}
                   </span>
                 </div>
-                <p className="text-gray-200 whitespace-pre-wrap">
+              <p
+                style={{
+                  whiteSpace: "pre-wrap",
+                  fontSize: "0.92rem",
+                  margin: 0,
+                  color: "#f8fafc",
+                }}
+              >
                   {note.text}
                 </p>
               </div>
@@ -1214,35 +2527,190 @@ const DayNotesModal = ({
           <div ref={notesEndRef} />
         </div>
 
-        {hasAccess && (
-          <form onSubmit={handleSubmit} className="flex flex-col gap-2">
+        {hasAccess ? (
+          <form
+            onSubmit={handleSubmit}
+            style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}
+          >
             <textarea
               rows="3"
               value={newNote}
               onChange={(e) => setNewNote(e.target.value)}
-              placeholder="Add a new note..."
-              className="w-full p-2 bg-black border border-gray-400 text-white rounded-md text-sm"
+              placeholder="Add a note…"
+              style={modalTextAreaStyle}
+              onFocus={(e) => {
+                e.currentTarget.style.boxShadow = "0 0 0 2px rgba(74, 222, 128, 0.35)";
+              }}
+              onBlur={(e) => {
+                e.currentTarget.style.boxShadow = "inset 0 0 0 1px rgba(15, 23, 42, 0.35)";
+              }}
             ></textarea>
+            <div style={{ display: "flex", justifyContent: "flex-end" }}>
             <button
               type="submit"
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-500 text-sm font-medium self-end"
+                style={{
+                  ...modalPrimaryButtonStyle,
+                  background: "linear-gradient(135deg, #22c55e, #86efac)",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = "translateY(-1px)";
+                  e.currentTarget.style.boxShadow = "0 12px 24px rgba(34, 197, 94, 0.25)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = "none";
+                  e.currentTarget.style.boxShadow = "none";
+                }}
             >
               Add Note
             </button>
+            </div>
           </form>
-        )}
-
-        {!hasAccess && (
-          <div className="flex justify-end">
+        ) : (
+          <div style={{ display: "flex", justifyContent: "flex-end" }}>
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 bg-gray-700 text-white rounded-md hover:bg-gray-600 text-sm font-medium"
+              style={modalSecondaryButtonStyle}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.border = "1px solid rgba(148, 163, 184, 0.55)";
+                e.currentTarget.style.color = "#f8fafc";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.border = "1px solid rgba(148, 163, 184, 0.35)";
+                e.currentTarget.style.color = "#e2e8f0";
+              }}
             >
               Close
             </button>
           </div>
         )}
+      </div>
+    </Modal>
+  );
+};
+
+/**
+ * Registered Users Modal
+ */
+const RegisteredUsersModal = ({ users, onClose }) => {
+  const sortedUsers = useMemo(() => {
+    return [...users].sort((a, b) => {
+      const nameA = `${a.lastName || ""}${a.firstName || ""}`.toLowerCase();
+      const nameB = `${b.lastName || ""}${b.firstName || ""}`.toLowerCase();
+      return nameA.localeCompare(nameB);
+    });
+  }, [users]);
+
+  return (
+    <Modal onClose={onClose}>
+      <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem", width: "100%", maxWidth: "36rem" }}>
+        <div>
+          <h3
+            style={{
+              fontSize: "1.35rem",
+              fontWeight: 700,
+              color: "#f8fafc",
+              marginBottom: "0.25rem",
+            }}
+          >
+            Registered Accounts
+          </h3>
+          <p
+            style={{
+              fontSize: "0.9rem",
+              color: "#94a3b8",
+              margin: 0,
+            }}
+          >
+            Overview of every profile that has signed in on this device.
+          </p>
+        </div>
+
+        <div
+          style={{
+            maxHeight: "22rem",
+            overflowY: "auto",
+            borderRadius: "1rem",
+            border: "1px solid rgba(148, 163, 184, 0.18)",
+            background: "linear-gradient(180deg, rgba(15,23,42,0.75), rgba(15,23,42,0.45))",
+            boxShadow: "inset 0 0 0 1px rgba(15, 23, 42, 0.35)",
+          }}
+        >
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1.2fr 0.8fr 0.8fr 1.2fr",
+              padding: "0.85rem 1rem",
+              textTransform: "uppercase",
+              letterSpacing: "0.05em",
+              fontSize: "0.7rem",
+              color: "#94a3b8",
+              borderBottom: "1px solid rgba(148, 163, 184, 0.18)",
+            }}
+          >
+            <span>Name</span>
+            <span>Initials</span>
+            <span>Role</span>
+            <span>Created</span>
+          </div>
+          {sortedUsers.length === 0 ? (
+            <div
+              style={{
+                padding: "1.25rem",
+                textAlign: "center",
+                fontSize: "0.95rem",
+                color: "rgba(148, 163, 184, 0.85)",
+              }}
+            >
+              No registered profiles yet.
+            </div>
+          ) : (
+            sortedUsers.map((user) => (
+              <div
+                key={`${user.userId}-${user.initials}`}
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1.2fr 0.8fr 0.8fr 1.2fr",
+                  padding: "0.9rem 1rem",
+                  borderBottom: "1px solid rgba(148, 163, 184, 0.12)",
+                  color: "#e2e8f0",
+                  fontSize: "0.9rem",
+                  alignItems: "center",
+                  gap: "0.5rem",
+                }}
+              >
+                <span>{`${user.firstName || ""} ${user.lastName || ""}`.trim() || "—"}</span>
+                <span style={{ fontFamily: "Roboto", letterSpacing: "0.08em" }}>
+                  {user.initials || "??"}
+                </span>
+                <span>
+                  {user.isAdmin ? "Admin" : user.hasAccess ? "Editor" : "Viewer"}
+                </span>
+                <span style={{ fontSize: "0.8rem", color: "#94a3b8" }}>
+                  {formatTimestamp(user.createdAt)}
+                </span>
+              </div>
+            ))
+          )}
+        </div>
+
+        <div style={{ display: "flex", justifyContent: "flex-end" }}>
+            <button
+              type="button"
+              onClick={onClose}
+            style={modalSecondaryButtonStyle}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.border = "1px solid rgba(148, 163, 184, 0.55)";
+              e.currentTarget.style.color = "#f8fafc";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.border = "1px solid rgba(148, 163, 184, 0.35)";
+              e.currentTarget.style.color = "#e2e8f0";
+            }}
+            >
+              Close
+            </button>
+          </div>
       </div>
     </Modal>
   );
@@ -1281,10 +2749,10 @@ const ArrowRightIcon = () => (
     />
   </svg>
 );
-const CalendarIcon = () => (
+const ArrowUpIcon = () => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
-    className="h-5 w-5"
+    className="h-4 w-4"
     fill="none"
     viewBox="0 0 24 24"
     stroke="currentColor"
@@ -1293,15 +2761,14 @@ const CalendarIcon = () => (
       strokeLinecap="round"
       strokeLinejoin="round"
       strokeWidth={2}
-      d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+      d="M5 15l7-7 7 7"
     />
   </svg>
 );
-// New Note Icon
-const NoteIcon = () => (
+const ArrowDownIcon = () => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
-    className="h-5 w-5"
+    className="h-4 w-4"
     fill="none"
     viewBox="0 0 24 24"
     stroke="currentColor"
@@ -1310,9 +2777,20 @@ const NoteIcon = () => (
       strokeLinecap="round"
       strokeLinejoin="round"
       strokeWidth={2}
-      d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"
+      d="M19 9l-7 7-7-7"
     />
   </svg>
+);
+const CalendarIcon = () => (
+  <span role="img" aria-label="Calendar" style={{ fontSize: "1.15rem", lineHeight: 1 }}>
+    🗓️
+  </span>
+);
+// New Note Icon
+const NoteIcon = () => (
+  <span role="img" aria-label="Notes" style={{ fontSize: "0.9rem", lineHeight: 0.5 }}>
+    📄
+  </span>
 );
 
 // --- Main App Component ---
@@ -1337,9 +2815,103 @@ const App = () => {
     y: 0,
     day: null,
   }); // State for paste menu
+  const boardScrollRef = useRef(null); // Ref for board scroll container
+  const syncScrollRef = useRef(false); // Prevent recursive scroll syncing
+  const [registeredUsers, setRegisteredUsers] = useState([]);
 
-  const { user, userId, userInfo, hasAccess, initials, isAuthReady, signUp } =
+  const { user, userId, userInfo, hasAccess, initials, isAuthReady, signUp, clearUserInfo } =
     useUserAccess();
+
+  const handleSignUp = useCallback(
+    async (firstName, lastName, code) => {
+      const result = await signUp(firstName, lastName, code);
+      if (result.success && result.user) {
+        setRegisteredUsers((prev) => {
+          const existingIndex = prev.findIndex(
+            (u) => u.userId === result.user.userId
+          );
+          if (existingIndex === -1) {
+            return [...prev, result.user];
+          }
+          const clone = [...prev];
+          clone[existingIndex] = { ...clone[existingIndex], ...result.user };
+          return clone;
+        });
+      }
+      return result;
+    },
+    [signUp]
+  );
+  const handleOpenAnalysis = useCallback(() => {
+    if (typeof window !== "undefined") {
+      window.open(ANALYSIS_URL, "_blank", "noopener,noreferrer");
+    }
+  }, []);
+  const handleOpenSiteManager = useCallback(() => {
+    if (typeof window !== "undefined") {
+      window.open(SITE_MANAGER_URL, "_blank", "noopener,noreferrer");
+    }
+  }, []);
+
+  const scrollColumnsBy = useCallback(
+     (delta) => {
+      const container = boardScrollRef.current;
+      const columns = container
+        ? container.querySelectorAll(".day-column-content")
+        : document.querySelectorAll(".day-column-content");
+      if (!columns.length) return;
+      syncScrollRef.current = true;
+      columns.forEach((col) => {
+        const nextTop = Math.max(
+          0,
+          Math.min(col.scrollHeight - col.clientHeight, col.scrollTop + delta)
+        );
+        col.scrollTo({ top: nextTop, behavior: "smooth" });
+      });
+      requestAnimationFrame(() => {
+        syncScrollRef.current = false;
+      });
+    },
+    []
+  );
+
+  const handleScrollUp = useCallback(() => {
+    scrollColumnsBy(-180);
+  }, [scrollColumnsBy]);
+
+  const handleScrollDown = useCallback(() => {
+    scrollColumnsBy(180);
+  }, [scrollColumnsBy]);
+
+  useEffect(() => {
+    if (!db) return;
+
+    try {
+      localStorage.setItem(
+        "scheduleRegisteredUsers",
+        JSON.stringify(registeredUsers)
+      );
+    } catch (error) {
+      console.error("Unable to persist registered users:", error);
+    }
+  }, [registeredUsers]);
+
+  useEffect(() => {
+    if (!userInfo || !userInfo.userId) return;
+    setRegisteredUsers((prev) => {
+      const existingIndex = prev.findIndex((u) => u.userId === userInfo.userId);
+      const enriched = {
+        ...userInfo,
+        createdAt: userInfo.createdAt || new Date().toISOString(),
+      };
+      if (existingIndex === -1) {
+        return [...prev, enriched];
+      }
+      const clone = [...prev];
+      clone[existingIndex] = { ...clone[existingIndex], ...enriched };
+      return clone;
+    });
+  }, [userInfo]);
 
   const weekId = useMemo(() => getWeekId(currentDate), [currentDate]);
   const weekDays = useMemo(() => {
@@ -1422,7 +2994,18 @@ const App = () => {
     const weekDocRef = doc(db, collectionPath, weekId); // Modular syntax
     const docSnap = await getDoc(weekDocRef); // Modular syntax
     if (docSnap.exists()) {
-      return docSnap.data().days;
+      const savedDays = Array.isArray(docSnap.data().days)
+        ? docSnap.data().days
+        : [];
+      const savedMap = new Map(savedDays.map((day) => [day.date, day]));
+      return weekDays.map((day) => {
+        const existing = savedMap.get(day.dateString);
+        return {
+          date: day.dateString,
+          shifts: existing?.shifts || [],
+          notes: existing?.notes || [],
+        };
+      });
     }
     return weekDays.map((day) => ({
       date: day.dateString,
@@ -1562,16 +3145,35 @@ const App = () => {
 
   // --- Navigation Handlers ---
   const goToPrevWeek = () => {
-    setCurrentDate((prev) => new Date(prev.setDate(prev.getDate() - 7)));
+    setCurrentDate((prev) => {
+      const next = new Date(prev);
+      next.setDate(next.getDate() - 7);
+      return next;
+    });
   };
   const goToNextWeek = () => {
-    setCurrentDate((prev) => new Date(prev.setDate(prev.getDate() + 7)));
+    setCurrentDate((prev) => {
+      const next = new Date(prev);
+      next.setDate(next.getDate() + 7);
+      return next;
+    });
   };
   const goToToday = () => {
-    setCurrentDate(new Date());
+    const today = new Date();
+    const normalized = new Date(
+      today.getFullYear(),
+      today.getMonth(),
+      today.getDate()
+    );
+    setCurrentDate(normalized);
   };
   const selectDate = (date) => {
-    setCurrentDate(date);
+    const normalized = new Date(
+      date.getFullYear(),
+      date.getMonth(),
+      date.getDate()
+    );
+    setCurrentDate(normalized);
     closeModal();
   };
 
@@ -1635,7 +3237,7 @@ const App = () => {
     );
   };
   const openSignUpModal = () => {
-    openModal(<SignUpModal onClose={closeModal} onSignUp={signUp} />);
+    openModal(<SignUpModal onClose={closeModal} onSignUp={handleSignUp} />);
   };
   const openCommentModal = (day, shift) => {
     openModal(
@@ -1646,6 +3248,14 @@ const App = () => {
         onUpdateShift={handleUpdateShift}
         hasAccess={hasAccess}
         userInfo={userInfo}
+      />
+    );
+  };
+  const openRegisteredUsersModal = () => {
+    openModal(
+      <RegisteredUsersModal
+        users={registeredUsers}
+        onClose={closeModal}
       />
     );
   };
@@ -1670,8 +3280,8 @@ const App = () => {
     setPasteMenuState({ visible: false }); // Close other menu
     setContextMenu({
       visible: true,
-      x: e.pageX,
-      y: e.pageY,
+      x: e.clientX,
+      y: e.clientY,
       day: day,
       shift: shift,
     });
@@ -1760,6 +3370,19 @@ const App = () => {
     openCommentModal(day, shift);
   };
 
+  const handleLogout = useCallback(async () => {
+    try {
+      if (auth) {
+        await signOut(auth);
+      }
+    } catch (error) {
+      console.error("Error during logout:", error);
+    } finally {
+      clearUserInfo();
+      setRegisteredUsers([]);
+    }
+  }, [clearUserInfo]);
+
   // --- Render ---
   if (!isAuthReady) {
     return (
@@ -1785,10 +3408,26 @@ const App = () => {
 
   return (
     <div
-      className="p-4 bg-black min-h-screen font-sans text-gray-100"
-      onClick={() => {
+      className="p-4 md:p-6 bg-black min-h-screen font-sans text-gray-100"
+      style={{
+        padding: "1rem",
+        backgroundColor: "#000000",
+        minHeight: "100vh",
+        color: "#f3f4f6",
+        fontFamily: "monospace",
+      }}
+      onClick={(e) => {
+        // Only close menus if clicking outside of them
+        if (!e.target.closest('.context-menu')) {
         setContextMenu({ visible: false });
         setPasteMenuState({ visible: false });
+        }
+      }}
+      onContextMenu={(e) => {
+        // Prevent default context menu on the main container
+        if (!e.target.closest('.shift-item')) {
+          e.preventDefault();
+        }
       }}
     >
       <Header
@@ -1799,60 +3438,69 @@ const App = () => {
         onSignUp={openSignUpModal}
         userInfo={userInfo}
         hasAccess={hasAccess}
+        onOpenAnalysis={handleOpenAnalysis}
+        onOpenSiteManager={handleOpenSiteManager}
+        showSettings={Boolean(userInfo?.isAdmin)}
+        onOpenSettings={openRegisteredUsersModal}
+        onLogout={handleLogout}
+        onScrollUp={handleScrollUp}
+        onScrollDown={handleScrollDown}
       />
 
       {/* Schedule Board */}
-      <div className="overflow-x-auto bg-black">
         <div
-          className="grid bg-black"
+        ref={boardScrollRef}
+        className="overflow-x-auto hide-scrollbar pb-4 relative"
           style={{
-            gridTemplateColumns: "repeat(7, minmax(200px, 1fr))",
+          overflowX: "auto", 
+          overflowY: "hidden",
+          paddingBottom: "1rem",
+          position: "relative",
+          msOverflowStyle: "none",
+          scrollbarWidth: "none",
+        }}
+        onWheel={(e) => {
+          if (Math.abs(e.deltaY) >= Math.abs(e.deltaX)) {
+            e.preventDefault();
+            const container = e.currentTarget;
+            container.scrollLeft += e.deltaY;
+          }
+        }}
+      >
+        <div 
+          className="flex flex-row" 
+          style={{ 
+            display: "flex",
+            flexDirection: "row",
+            alignItems: "stretch",
+            width: "175vw", 
+            minWidth: "100%" 
           }}
         >
           {loading ? (
-            <div className="text-white col-span-7 text-center p-10">
+            <div className="text-white text-center p-10 w-full">
               Loading Week Data...
             </div>
           ) : (
             weekData.days.map((day) => {
               const hasNotes = day.notes && day.notes.length > 0;
               return (
-                <div
-                  key={day.date.toISOString()}
-                  className="" // Removed border-r
-                >
                   <DayColumn
+                  key={day.date.toISOString()}
                     day={day}
                     shifts={day.shifts}
+                    hasAccess={hasAccess}
+                    hasNotes={hasNotes}
+                    boardScrollRef={boardScrollRef}
+                    syncScrollRef={syncScrollRef}
                     onContextMenu={(e, shift) =>
                       handleContextMenu(e, day, shift)
                     }
                     onDoubleClick={(shift) => handleDoubleClick(day, shift)}
+                    onAddShift={() => openAddShiftModal(day)}
+                    onPasteMenu={(e) => handlePasteMenu(e, day)}
+                    onDayNotes={() => openDayNotesModal(day, day.notes)}
                   />
-                  {/* Bottom controls: Add shift and Notes */}
-                  <div className="p-3 flex items-center gap-2 bg-black border-t border-gray-800">
-                    {hasAccess && (
-                      <button
-                        onClick={() => openAddShiftModal(day)}
-                        onContextMenu={(e) => handlePasteMenu(e, day)} // Right-click to paste
-                        className="flex-grow py-3 text-center text-gray-300 font-bold text-xl rounded-lg hover:bg-gray-800 hover:text-white transition-colors duration-150 bg-gray-900"
-                      >
-                        +
-                      </button>
-                    )}
-                    <button
-                      onClick={() => openDayNotesModal(day, day.notes)}
-                      className={`p-2 rounded-lg hover:bg-gray-800 text-gray-400 hover:text-white transition-colors ${
-                        hasNotes
-                          ? "text-orange-400"
-                          : ""
-                      }`}
-                      aria-label="View Day Notes"
-                    >
-                      <NoteIcon />
-                    </button>
-                  </div>
-                </div>
               );
             })
           )}
