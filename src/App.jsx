@@ -23,7 +23,7 @@ import {
 } from "firebase/auth";
 
 // --- Firebase Configuration ---
-// This will be populated by the .env.local file
+// This will be populated by the .env.local file or GitHub Secrets during build
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
@@ -34,16 +34,38 @@ const firebaseConfig = {
   measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
 };
 
+// Check if Firebase config is valid
+const isFirebaseConfigValid = () => {
+  return (
+    firebaseConfig.apiKey &&
+    firebaseConfig.authDomain &&
+    firebaseConfig.projectId &&
+    firebaseConfig.appId
+  );
+};
+
 // Initialize Firebase (Modular syntax)
 let app, db, auth;
-try {
-  app = initializeApp(firebaseConfig);
-  db = getFirestore(app);
-  auth = getAuth(app);
-  setLogLevel("debug"); // Enable Firebase logging
-} catch (e) {
-  console.error("Firebase initialization error:", e);
-  // Create dummy objects to prevent further crashes
+if (isFirebaseConfigValid()) {
+  try {
+    app = initializeApp(firebaseConfig);
+    db = getFirestore(app);
+    auth = getAuth(app);
+    setLogLevel("debug"); // Enable Firebase logging
+    console.log("Firebase initialized successfully");
+  } catch (e) {
+    console.error("Firebase initialization error:", e);
+    // Create dummy objects to prevent further crashes
+    db = null;
+    auth = null;
+  }
+} else {
+  console.error("Firebase configuration is missing. Required values:", {
+    hasApiKey: !!firebaseConfig.apiKey,
+    hasAuthDomain: !!firebaseConfig.authDomain,
+    hasProjectId: !!firebaseConfig.projectId,
+    hasAppId: !!firebaseConfig.appId,
+  });
   db = null;
   auth = null;
 }
