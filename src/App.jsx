@@ -276,30 +276,30 @@ const Header = ({
   hasAccess,
 }) => {
   return (
-    <header className="mb-4 p-4 bg-black border border-white rounded-lg shadow flex flex-col md:flex-row justify-between items-center">
+    <header className="mb-4 p-4 bg-black flex flex-col md:flex-row justify-between items-center">
       {/* Left Side: Navigation */}
       <div className="flex items-center gap-2">
         <button
           onClick={onPrevWeek}
-          className="px-3 py-2 bg-gray-800 border border-white text-white rounded-md hover:bg-gray-700"
+          className="px-3 py-2 bg-transparent text-white rounded-md hover:bg-gray-800 border border-gray-700"
         >
           <ArrowLeftIcon />
         </button>
         <button
           onClick={onToday}
-          className="px-4 py-2 bg-gray-800 border border-white text-white rounded-md hover:bg-gray-700 text-sm font-medium"
+          className="px-4 py-2 bg-transparent text-white rounded-md hover:bg-gray-800 text-sm font-medium border border-gray-700"
         >
           Today
         </button>
         <button
           onClick={onNextWeek}
-          className="px-3 py-2 bg-gray-800 border border-white text-white rounded-md hover:bg-gray-700"
+          className="px-3 py-2 bg-transparent text-white rounded-md hover:bg-gray-800 border border-gray-700"
         >
           <ArrowRightIcon />
         </button>
         <button
           onClick={onOpenCalendar}
-          className="px-3 py-2 bg-gray-800 border border-white text-white rounded-md hover:bg-gray-700"
+          className="px-3 py-2 bg-transparent text-white rounded-md hover:bg-gray-800 border border-gray-700"
         >
           <CalendarIcon />
         </button>
@@ -308,13 +308,13 @@ const Header = ({
       {/* Right Side: Auth */}
       <div className="flex items-center gap-4 mt-2 md:mt-0">
         {hasAccess && userInfo ? (
-          <div className="flex items-center justify-center w-10 h-10 bg-blue-600 text-white rounded-full font-bold border-2 border-white">
+          <div className="flex items-center justify-center w-10 h-10 bg-blue-600 text-white rounded-full font-bold">
             {userInfo.initials}
           </div>
         ) : (
           <button
             onClick={onSignUp}
-            className="px-4 py-2 bg-blue-600 border border-white text-white rounded-md hover:bg-blue-500 text-sm font-medium"
+            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-500 text-sm font-medium"
           >
             Sign Up
           </button>
@@ -353,26 +353,31 @@ const Shift = ({ shift, onContextMenu, onDoubleClick }) => {
     <div
       onContextMenu={(e) => onContextMenu(e, shift)}
       onDoubleClick={() => onDoubleClick(shift)}
-      className="p-2 rounded-md cursor-pointer select-none mb-2 border border-gray-600 shadow-sm hover:shadow-md transition-shadow"
+      className="p-3 rounded-lg cursor-pointer select-none mb-2 hover:opacity-90 transition-opacity"
       style={{
         backgroundColor: effectiveBgColor,
         color: effectiveFontColor,
-        borderRight: hasComments ? "3px solid #FFA500" : "1px solid #4B5563",
+        borderRight: hasComments ? "4px solid #FFA500" : "none",
       }}
     >
       <div className="flex justify-between items-center">
         <span
-          className="font-mono font-bold text-sm" // Removed 'truncate'
+          className="font-mono font-semibold text-sm"
           style={siteStyle}
         >
           {site} {startTime}-{endTime}
         </span>
-        <span
-          className="font-mono font-bold text-sm ml-2 flex-shrink-0"
-          style={{ color: effectiveFontColor }}
-        >
-          {initials}
-        </span>
+        {initials && (
+          <div 
+            className="ml-2 flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold"
+            style={{ 
+              backgroundColor: effectiveFontColor === "#FFFFFF" ? "rgba(0,0,0,0.2)" : "rgba(255,255,255,0.2)",
+              color: effectiveFontColor
+            }}
+          >
+            {initials}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -391,18 +396,14 @@ const DayColumn = ({ day, shifts, onContextMenu, onDoubleClick }) => {
   }, [shifts]);
 
   return (
-    <div className="flex-1 min-w-[200px] md:min-w-[220px] bg-black border-r border-gray-700">
-      <div className="text-center p-3 sticky top-0 bg-black z-10 border-b border-gray-700">
-        <div className="font-bold text-white text-sm">
+    <div className="flex-1 min-w-[200px] md:min-w-[220px] bg-black border-r border-gray-800">
+      <div className="text-center p-3 sticky top-0 bg-black z-10 border-b border-gray-800">
+        <div className="font-semibold text-white text-sm uppercase">
           {formatDateHeader(day.date)}
         </div>
       </div>
-      <div className="p-2 h-full bg-black min-h-[400px]">
-        {sortedShifts.length === 0 ? (
-          <div className="text-gray-500 text-xs text-center py-4">
-            No shifts
-          </div>
-        ) : (
+      <div className="p-3 h-full bg-black min-h-[500px]">
+        {sortedShifts.length === 0 ? null : (
           sortedShifts.map((shift) => (
             <Shift
               key={shift.id}
@@ -1784,7 +1785,7 @@ const App = () => {
 
   return (
     <div
-      className="p-4 md:p-6 bg-black min-h-screen font-sans text-gray-100"
+      className="p-4 bg-black min-h-screen font-sans text-gray-100"
       onClick={() => {
         setContextMenu({ visible: false });
         setPasteMenuState({ visible: false });
@@ -1801,7 +1802,7 @@ const App = () => {
       />
 
       {/* Schedule Board */}
-      <div className="overflow-x-auto pb-4 bg-black">
+      <div className="overflow-x-auto bg-black">
         <div
           className="grid bg-black"
           style={{
@@ -1829,22 +1830,22 @@ const App = () => {
                     onDoubleClick={(shift) => handleDoubleClick(day, shift)}
                   />
                   {/* Bottom controls: Add shift and Notes */}
-                  <div className="p-2 flex items-center gap-2 bg-black border-t border-gray-700">
+                  <div className="p-3 flex items-center gap-2 bg-black border-t border-gray-800">
                     {hasAccess && (
                       <button
                         onClick={() => openAddShiftModal(day)}
                         onContextMenu={(e) => handlePasteMenu(e, day)} // Right-click to paste
-                        className="flex-grow py-2 text-center text-gray-400 font-bold text-lg rounded-md hover:bg-gray-700 hover:text-white transition-colors duration-150 border border-gray-600"
+                        className="flex-grow py-3 text-center text-gray-300 font-bold text-xl rounded-lg hover:bg-gray-800 hover:text-white transition-colors duration-150 bg-gray-900"
                       >
                         +
                       </button>
                     )}
                     <button
                       onClick={() => openDayNotesModal(day, day.notes)}
-                      className={`p-2 rounded-md hover:bg-gray-700 text-gray-400 hover:text-white ${
+                      className={`p-2 rounded-lg hover:bg-gray-800 text-gray-400 hover:text-white transition-colors ${
                         hasNotes
-                          ? "border border-orange-500 text-orange-500"
-                          : "border border-gray-600"
+                          ? "text-orange-400"
+                          : ""
                       }`}
                       aria-label="View Day Notes"
                     >
