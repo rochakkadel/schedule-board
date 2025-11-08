@@ -141,9 +141,9 @@ const DEFAULT_SITE_NAMES = [
 const FONT_COLORS = ["#000000", "#FFFFFF", "#FF0000"]; // black, white, red
 const FILL_COLORS = ["#FFFFFF", "#008000", "#0000FF", "#000000", "#FFA500"]; // white, green, blue, black, orange
 
-const COLOR_COMPLETE_BG = "#22C55E"; // Lighter Green
+const COLOR_COMPLETE_BG = "#32CD32"; // Lighter Green
 const COLOR_COMPLETE_FONT = "#FFFFFF"; // White
-const COLOR_OPS_BG = "#3B82F6"; // Lighter Blue
+const COLOR_OPS_BG = "#6495ED"; // Lighter Blue
 const COLOR_OPS_FONT = "#FFFFFF"; // White
 const ANALYSIS_URL =
   "https://xxxrkxxxrkxxx-ui.github.io/Analysis/?reportId=ipyvgB5vn4FqlEOxTgIL";
@@ -808,7 +808,7 @@ const Shift = ({ shift, onContextMenu, onDoubleClick }) => {
     : effectiveBgColor;
   const displayFont = isComplete || isOps ? "#FFFFFF" : effectiveFontColor;
 
-  const defaultTextColor = site.startsWith("@") ? "#8F2915" : displayFont;
+  const defaultTextColor = site.startsWith("@") ? "#880808" : displayFont;
   const siteStyle = {
     color: defaultTextColor,
   };
@@ -850,7 +850,7 @@ const Shift = ({ shift, onContextMenu, onDoubleClick }) => {
           className="font-mono font-bold text-sm"
           style={{
             ...siteStyle,
-            fontSize: "0.95rem",
+            fontSize: "0.82rem",
             letterSpacing: "0.04em",
             fontWeight: 700,
           }}
@@ -863,6 +863,8 @@ const Shift = ({ shift, onContextMenu, onDoubleClick }) => {
             color: displayFont,
             marginLeft: "auto",
             fontWeight: 700,
+            textTransform: "uppercase",
+            fontSize: "0.78rem",
             }}
           >
             {initials}
@@ -898,12 +900,12 @@ const DayColumn = ({
 
   return (
     <div 
-      className="flex flex-col w-[25vw] min-w-[25vw] flex-shrink-0"
+      className="flex flex-col flex-shrink-0"
       style={{
         display: "flex",
         flexDirection: "column",
-        width: "25vw",
-        minWidth: "25vw",
+        flexBasis: "20%",
+        maxWidth: "20%",
         flexShrink: 0,
         height: "100%",
       }}
@@ -940,6 +942,7 @@ const DayColumn = ({
           backgroundColor: "#000000",
           minHeight: "400px",
           overflowY: "auto",
+          fontSize: "0.85rem",
         }}
         onScroll={(e) => {
           const container = boardScrollRef?.current;
@@ -2680,7 +2683,7 @@ const RegisteredUsersModal = ({ users, onClose }) => {
                 }}
               >
                 <span>{`${user.firstName || ""} ${user.lastName || ""}`.trim() || "—"}</span>
-                <span style={{ fontFamily: "Roboto", letterSpacing: "0.08em" }}>
+                <span style={{ fontFamily: "monospace", letterSpacing: "0.08em" }}>
                   {user.initials || "??"}
                 </span>
                 <span>
@@ -3348,6 +3351,12 @@ const App = () => {
     const { shift } = contextMenu;
     if (shift) {
       setClipboard(shift); // Copy shift data to state
+      const details = `Site: ${shift.site}\nTime: ${shift.startTime}-${shift.endTime}\nInitials: ${shift.initials || ""}`;
+      if (navigator.clipboard?.writeText) {
+        navigator.clipboard.writeText(details).catch((err) => {
+          console.warn("Unable to write shift details to clipboard:", err);
+        });
+      }
     }
     setContextMenu({ visible: false });
   };
@@ -3415,6 +3424,7 @@ const App = () => {
         minHeight: "100vh",
         color: "#f3f4f6",
         fontFamily: "monospace",
+        fontSize: "0.88rem",
       }}
       onClick={(e) => {
         // Only close menus if clicking outside of them
@@ -3458,10 +3468,12 @@ const App = () => {
           position: "relative",
           msOverflowStyle: "none",
           scrollbarWidth: "none",
+
         }}
         onWheel={(e) => {
           if (Math.abs(e.deltaY) >= Math.abs(e.deltaX)) {
             e.preventDefault();
+            e.stopPropagation();
             const container = e.currentTarget;
             container.scrollLeft += e.deltaY;
           }
@@ -3473,8 +3485,8 @@ const App = () => {
             display: "flex",
             flexDirection: "row",
             alignItems: "stretch",
-            width: "175vw", 
-            minWidth: "100%" 
+            width: "95%",
+            minWidth: "80%" 
           }}
         >
           {loading ? (
