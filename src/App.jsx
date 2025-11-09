@@ -605,6 +605,23 @@ const Header = ({
     transition: "border 0.15s ease, color 0.15s ease, transform 0.15s ease",
   };
 
+  const legalButtonStyle = {
+    ...linkButtonStyle,
+    padding: "0.4rem 0.85rem",
+    fontSize: "0.75rem",
+    letterSpacing: "0.06em",
+  };
+
+  const openLegalOverview = useCallback(() => {
+    if (typeof window !== "undefined") {
+      window.open(
+        "https://github.com/rochakkadel/schedule-board/blob/dc00467ff6f8f9eb3ced2b58cf83a347d978e4a9/LEGAL_AND_TECH_OVERVIEW.md",
+        "_blank",
+        "noopener,noreferrer"
+      );
+    }
+  }, []);
+
   const renderNavButton = (label, handler, fontSize) => (
     <button
       className="micro-pressable"
@@ -699,21 +716,48 @@ const Header = ({
         style={{
           display: "flex",
           alignItems: "center",
-          gap: "0.6rem",
+          gap: "0.9rem",
         }}
       >
-        <span
+        <div
           style={{
-            color: "#ffffff",
-            fontSize: "0.62rem",
-            letterSpacing: "0.08em",
-            textTransform: "uppercase",
-            textShadow: "0 0 6px rgba(255, 191, 0, 0.75)",
-            fontWeight: 500,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "flex-end",
+            gap: "0.3rem",
           }}
         >
-          © 2025 Rochak Kadel. All rights reserved
-        </span>
+          <button
+            type="button"
+            onClick={openLegalOverview}
+            className="micro-pressable micro-pill"
+            style={legalButtonStyle}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.border = "1px solid rgba(96, 165, 250, 0.75)";
+              e.currentTarget.style.color = "#bfdbfe";
+              e.currentTarget.style.transform = "translateY(-1px)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.border = "1px solid rgba(148, 163, 184, 0.45)";
+              e.currentTarget.style.color = "#e2e8f0";
+              e.currentTarget.style.transform = "none";
+            }}
+          >
+            Documentation
+          </button>
+          <span
+            style={{
+              color: "#ffffff",
+              fontSize: "0.62rem",
+              letterSpacing: "0.08em",
+              textTransform: "uppercase",
+              textShadow: "0 0 6px rgba(255, 191, 0, 0.75)",
+              fontWeight: 500,
+            }}
+          >
+            © 2025 Rochak Kadel. All rights reserved
+          </span>
+        </div>
         {userInfo ? (
           <div
             ref={avatarMenuRef}

@@ -89,13 +89,16 @@ Third-party dependencies are managed via `package.json`. Refer to the dependency
 
 ## 9. Deployment & Operations
 
-coming soon
+- **Environments:** Configure separate Firebase projects for development, staging, and production. Populate environment variables via `.env` files or CI/CD secrets.
+- **CI/CD:** Automate build & deploy pipelines to ensure reproducible releases (GitHub Actions, Netlify, Vercel, or custom pipelines).
+- **Monitoring:** Recommended tools include Firebase Performance Monitoring, Google Analytics, or Sentry for error tracking.
+- **Backups:** Use scheduled exports of Firestore collections or integrate with managed backup services.
 
 ---
 
 ## 10. Support & Maintenance
 
-coming soon
+- **Issue Tracking:** Maintain a ticketing system (GitHub Issues, Jira) for feature requests and bug reports.
 
 
 ---
@@ -129,6 +132,7 @@ coming soon
 | 2025-11-09 | 1.0 | Rochak Kadel | Initial creation of legal, technical, and feature overview. |
 
 ---
+
 
 
 
