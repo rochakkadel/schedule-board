@@ -1472,7 +1472,7 @@ const AddShiftModal = ({
                 e.currentTarget.style.boxShadow = "none";
               }}
           >
-            Add Shift
+            Add Shit
           </button>
         </div>
       </form>
