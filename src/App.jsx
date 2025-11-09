@@ -176,6 +176,28 @@ const formatTimestamp = (isoString) => {
   }
 };
 
+const extractDisplayName = (displayString = "") => {
+  if (!displayString) return "Unknown User";
+  const trimmed = displayString.trim();
+  const withoutInitials = trimmed.replace(/\s*\([^)]+\)\s*$/, "").trim();
+  return withoutInitials || trimmed;
+};
+
+const extractInitials = (displayString = "") => {
+  if (!displayString) return "??";
+  const match = displayString.match(/\(([A-Za-z]{1,4})\)\s*$/);
+  if (match && match[1]) {
+    return match[1].slice(0, 3).toUpperCase();
+  }
+  const parts = displayString
+    .replace(/[()]/g, " ")
+    .split(/\s+/)
+    .filter(Boolean);
+  if (parts.length === 0) return "??";
+  const initials = parts.slice(0, 2).map((part) => part[0]);
+  return initials.join("").toUpperCase();
+};
+
 // --- Shared Styling Helpers ---
 const modalLabelStyle = {
   display: "block",
@@ -350,19 +372,88 @@ const useUserAccess = () => {
   const initials = useMemo(() => userInfo?.initials || "??", [userInfo]);
   const userId = useMemo(() => user?.uid || null, [user]);
 
+  useEffect(() => {
+    if (!user?.uid || !userInfo || userInfo.userId === user.uid) return;
+
+    const updatedInfo = {
+      ...userInfo,
+      userId: user.uid,
+      syncedWithFirebase: true,
+    };
+
+    setUserInfo(updatedInfo);
+    try {
+      localStorage.setItem("scheduleUser", JSON.stringify(updatedInfo));
+    } catch (storageError) {
+      console.error("Error updating stored user info:", storageError);
+    }
+
+    if (db) {
+      const userDocRef = doc(
+        db,
+        "artifacts",
+        appId,
+        "public",
+        "data",
+        "registered-users",
+        user.uid
+      );
+      setDoc(userDocRef, updatedInfo, { merge: true }).catch((firestoreError) => {
+        console.error("Error syncing user info after auth ready:", firestoreError);
+      });
+    }
+  }, [user?.uid, userInfo]);
+
   const signUp = async (firstName, lastName, code) => {
     const trimmedCode = code.trim();
     const isVip = trimmedCode === "12893";
-    const hasEditAccess =
-      trimmedCode.length === 0
-        ? false
-        : trimmedCode === ACCESS_CODE || isVip;
+    const grantsEditAccess =
+      trimmedCode.length > 0 && (trimmedCode === ACCESS_CODE || isVip);
+    const invalidCodeEntered = trimmedCode.length > 0 && !grantsEditAccess;
 
-    if (trimmedCode.length > 0 && !hasEditAccess) {
-      return { success: false, error: "Invalid access code." };
-    }
-    if (!userId) {
-      return { success: false, error: "Authentication not ready." };
+    const resolveUserId = async () => {
+      if (userId) return userId;
+      if (auth?.currentUser?.uid) return auth.currentUser.uid;
+      if (!auth) return null;
+
+      try {
+        await signInAnonymously(auth);
+      } catch (authError) {
+        console.warn("Retry anonymous sign-in failed:", authError);
+      }
+
+      return await new Promise((resolve) => {
+        let resolved = false;
+        let unsubscribeFn = null;
+        const timeout = setTimeout(() => {
+          if (!resolved) {
+            resolved = true;
+            if (unsubscribeFn) unsubscribeFn();
+            resolve(null);
+          }
+        }, 2000);
+
+        unsubscribeFn = onAuthStateChanged(auth, (nextUser) => {
+          if (resolved) return;
+          if (nextUser?.uid) {
+            resolved = true;
+            clearTimeout(timeout);
+            if (unsubscribeFn) unsubscribeFn();
+            resolve(nextUser.uid);
+          }
+        });
+      });
+    };
+
+    let ensuredUserId = await resolveUserId();
+    const usedFallbackId = !ensuredUserId;
+
+    if (!ensuredUserId) {
+      try {
+        ensuredUserId = `local-${crypto.randomUUID()}`;
+      } catch {
+        ensuredUserId = `local-${Date.now()}`;
+      }
     }
 
     const firstInitial = firstName.trim()[0] || "";
@@ -371,16 +462,25 @@ const useUserAccess = () => {
       firstName,
       lastName,
       initials: `${firstInitial}${lastInitial}`.toUpperCase(),
-      hasAccess: hasEditAccess,
+      hasAccess: grantsEditAccess,
       isAdmin: isVip,
-      userId: userId,
+      userId: ensuredUserId,
       createdAt: new Date().toISOString(),
+      syncedWithFirebase: !usedFallbackId,
     };
 
     try {
       localStorage.setItem("scheduleUser", JSON.stringify(newInfo));
-      setUserInfo(newInfo);
-      if (db) {
+    } catch (storageError) {
+      console.error("Error saving user info to local storage:", storageError);
+      return { success: false, error: "Could not save user data locally." };
+    }
+
+    setUserInfo(newInfo);
+
+    let remoteSyncWarning = null;
+    if (db && !usedFallbackId) {
+      try {
         const userDocRef = doc(
           db,
           "artifacts",
@@ -388,15 +488,32 @@ const useUserAccess = () => {
           "public",
           "data",
           "registered-users",
-          userId
+          ensuredUserId
         );
         await setDoc(userDocRef, newInfo, { merge: true });
+      } catch (firestoreError) {
+        console.error("Error syncing user info to Firestore:", firestoreError);
+        remoteSyncWarning =
+          "Account saved locally, but cloud sync failed. We'll retry later.";
       }
-      return { success: true, error: null, user: newInfo };
-    } catch (e) {
-      console.error("Error saving user info:", e);
-      return { success: false, error: "Could not save user data." };
     }
+
+    return {
+      success: true,
+      error: null,
+      user: newInfo,
+      warning: [
+        invalidCodeEntered
+          ? "Invalid access code. View-only account created."
+          : null,
+        usedFallbackId
+          ? "Account saved locally. We will sync once authentication finishes."
+          : null,
+        remoteSyncWarning,
+      ]
+        .filter(Boolean)
+        .join(" "),
+    };
   };
 
   const clearUserInfo = useCallback(() => {
@@ -1445,22 +1562,22 @@ const AddShiftModal = ({
               marginTop: "0.5rem",
             }}
           >
-          <button
-            type="button"
-            onClick={onClose}
-              style={modalSecondaryButtonStyle}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.border = "1px solid rgba(148, 163, 184, 0.55)";
-                e.currentTarget.style.color = "#f8fafc";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.border = "1px solid rgba(148, 163, 184, 0.35)";
-                e.currentTarget.style.color = "#e2e8f0";
-              }}
-          >
-            Cancel
-          </button>
-          <button
+        <button
+          type="button"
+          onClick={onClose}
+            style={modalSecondaryButtonStyle}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.border = "1px solid rgba(148, 163, 184, 0.55)";
+              e.currentTarget.style.color = "#f8fafc";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.border = "1px solid rgba(148, 163, 184, 0.35)";
+              e.currentTarget.style.color = "#e2e8f0";
+            }}
+        >
+          Cancel
+        </button>
+        <button
             type="submit"
               style={modalPrimaryButtonStyle}
               onMouseEnter={(e) => {
@@ -2018,17 +2135,23 @@ const SignUpModal = ({ onClose, onSignUp }) => {
   const [lastName, setLastName] = useState("");
   const [accessCode, setAccessCode] = useState("");
   const [error, setError] = useState("");
+  const [feedback, setFeedback] = useState("");
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
+    setFeedback("");
     if (!firstName.trim() || !lastName.trim()) {
       setError("First and last name are required.");
       return;
     }
     const result = await onSignUp(firstName.trim(), lastName.trim(), accessCode);
     if (result.success) {
-      onClose();
+      if (result.warning) {
+        setFeedback(result.warning);
+      } else {
+        onClose();
+      }
     } else if (result.error) {
       setError(result.error);
     }
@@ -2096,13 +2219,13 @@ const SignUpModal = ({ onClose, onSignUp }) => {
             </div>
         </div>
         <div>
-            <label style={modalLabelStyle}>Acces Code</label>
+            <label style={modalLabelStyle}>Access Code (optional)</label>
           <input
             type="password"
             value={accessCode}
             onChange={(e) => setAccessCode(e.target.value)}
               style={modalInputStyle}
-              placeholder="OPTIONAL, EDITOR OR ADMIN LEVEL ACCES"
+              placeholder="Enter editor or admin code"
           />
             <p
               style={{
@@ -2111,7 +2234,7 @@ const SignUpModal = ({ onClose, onSignUp }) => {
                 color: "#64748b",
               }}
             >
-
+              Leave blank to continue with view-only access.
             </p>
         </div>
 
@@ -2129,6 +2252,20 @@ const SignUpModal = ({ onClose, onSignUp }) => {
             </div>
           )}
 
+          {feedback && (
+            <div
+              style={{
+                padding: "0.75rem",
+                borderRadius: "0.75rem",
+                backgroundColor: "rgba(37, 99, 235, 0.12)",
+                color: "#bfdbfe",
+                fontSize: "0.85rem",
+              }}
+            >
+              {feedback}
+            </div>
+          )}
+
           <div
             style={{
               display: "flex",
@@ -2137,21 +2274,21 @@ const SignUpModal = ({ onClose, onSignUp }) => {
               marginTop: "0.5rem",
             }}
           >
-          <button
-            type="button"
-            onClick={onClose}
-              style={modalSecondaryButtonStyle}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.border = "1px solid rgba(148, 163, 184, 0.55)";
-                e.currentTarget.style.color = "#f8fafc";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.border = "1px solid rgba(148, 163, 184, 0.35)";
-                e.currentTarget.style.color = "#e2e8f0";
-              }}
-          >
-            Cancel
-          </button>
+        <button
+          type="button"
+          onClick={onClose}
+            style={modalSecondaryButtonStyle}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.border = "1px solid rgba(148, 163, 184, 0.55)";
+              e.currentTarget.style.color = "#f8fafc";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.border = "1px solid rgba(148, 163, 184, 0.35)";
+              e.currentTarget.style.color = "#e2e8f0";
+            }}
+        >
+          {feedback ? "Close" : "Cancel"}
+        </button>
           <button
             type="submit"
               style={modalPrimaryButtonStyle}
@@ -2241,16 +2378,17 @@ const CommentModal = ({
 
         <div
           style={{
-            maxHeight: "16rem",
+            maxHeight: "40rem",
+            minHeight: "30rem",
             overflowY: "auto",
             display: "flex",
             flexDirection: "column",
             gap: "0.9rem",
-            padding: "1rem",
-            backgroundColor: "#064e3b",
+            padding: "1.25rem",
+            backgroundColor: "rgba(2, 6, 23, 0.85)",
             borderRadius: "1rem",
-            border: "1px solid rgba(110, 231, 183, 0.75)",
-            boxShadow: "0 18px 36px rgba(2, 6, 23, 0.55)",
+            border: "1px solid rgba(148, 163, 184, 0.35)",
+            boxShadow: "0 18px 36px rgba(2, 6, 23, 0.45)",
           }}
         >
           {comments.length === 0 && (
@@ -2261,50 +2399,81 @@ const CommentModal = ({
                 fontSize: "0.9rem",
               }}
             >
-                
+              No comments yet.
             </div>
           )}
-          {comments.map((comment) => (
-            <div
-              key={comment.id}
-              style={{
-                backgroundColor: "#22c55e",
-                border: "1px solid rgba(187, 247, 208, 0.9)",
-                borderRadius: "0.9rem",
-                padding: "0.9rem 1rem",
-                color: "#0f172a",
-                display: "flex",
-                flexDirection: "column",
-                gap: "0.45rem",
-              }}
-            >
+          {comments.map((comment) => {
+            const displayName = extractDisplayName(comment.user);
+            const initials = extractInitials(comment.user);
+            return (
               <div
+                key={comment.id}
                 style={{
                   display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  gap: "0.5rem",
+                  alignItems: "flex-start",
+                  gap: "0.9rem",
+                  paddingBottom: "1.1rem",
+                  borderRadius: "0.75rem",
+                  backgroundColor: "transparent",
+                  border: "none",
+                  boxShadow: "none",
                 }}
               >
-                <span style={{ fontWeight: 700, color: "#022c1a", fontSize: "0.9rem" }}>
-                    {comment.user}
-                  </span>
-                <span style={{ fontSize: "0.75rem", color: "#065f46" }}>
-                  {formatTimestamp(comment.date)}
-                  </span>
+                <div
+                  style={{
+                    width: "2.6rem",
+                    height: "2.6rem",
+                    borderRadius: "9999px",
+                    background: "linear-gradient(135deg, #1f2937, #3b82f6)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontWeight: 700,
+                    fontSize: "0.95rem",
+                    color: "#e2e8f0",
+                    flexShrink: 0,
+                  }}
+                >
+                  {initials}
                 </div>
-              <p
-                style={{
-                  whiteSpace: "pre-wrap",
-                  fontSize: "0.92rem",
-                  margin: 0,
-                  color: "#04120c",
-                }}
-              >
-                  {comment.text}
-                </p>
+                <div
+                  style={{
+                    flex: 1,
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "0.45rem",
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "baseline",
+                      gap: "1rem",
+                    }}
+                  >
+                    <span style={{ fontWeight: 600, color: "#f1f5f9", fontSize: "0.95rem" }}>
+                      {displayName}
+                    </span>
+                    <span style={{ fontSize: "0.75rem", color: "#94a3b8" }}>
+                      {formatTimestamp(comment.date)}
+                    </span>
+                  </div>
+                  <p
+                    style={{
+                      whiteSpace: "pre-wrap",
+                      fontSize: "0.95rem",
+                      margin: 0,
+                      color: "#cbd5f5",
+                      lineHeight: 1.5,
+                    }}
+                  >
+                    {comment.text}
+                  </p>
+                </div>
               </div>
-            ))}
+            );
+          })}
           <div ref={commentsEndRef} />
         </div>
 
@@ -2430,16 +2599,17 @@ const DayNotesModal = ({
 
         <div
           style={{
-            maxHeight: "16rem",
+            maxHeight: "40rem",
+            minHeight: "30rem",
             overflowY: "auto",
             display: "flex",
             flexDirection: "column",
             gap: "0.9rem",
-            padding: "1rem",
-            backgroundColor: "#064e3b",
+            padding: "1.25rem",
+            backgroundColor: "rgba(2, 6, 23, 0.85)",
             borderRadius: "1rem",
-            border: "1px solid rgba(134, 239, 172, 0.85)",
-            boxShadow: "0 18px 36px rgba(2, 6, 23, 0.55)",
+            border: "1px solid rgba(148, 163, 184, 0.35)",
+            boxShadow: "0 18px 36px rgba(2, 6, 23, 0.45)",
           }}
         >
           {dayNotes.length === 0 && (
@@ -2453,47 +2623,78 @@ const DayNotesModal = ({
               No notes recorded yet.
             </div>
           )}
-          {dayNotes.map((note) => (
-            <div
-              key={note.id}
-              style={{
-                backgroundColor: "#22c55e",
-                border: "1px solid rgba(187, 247, 208, 0.95)",
-                borderRadius: "0.9rem",
-                padding: "0.9rem 1rem",
-                color: "#000000",
-                display: "flex",
-                flexDirection: "column",
-                gap: "0.45rem",
-              }}
-            >
+          {dayNotes.map((note) => {
+            const displayName = extractDisplayName(note.user);
+            const initials = extractInitials(note.user);
+            return (
               <div
+                key={note.id}
                 style={{
                   display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  gap: "0.5rem",
+                  alignItems: "flex-start",
+                  gap: "0.9rem",
+                  paddingBottom: "1.1rem",
+                  borderRadius: "0.75rem",
+                  backgroundColor: "transparent",
+                  border: "none",
+                  boxShadow: "none",
                 }}
               >
-                <span style={{ fontWeight: 700, color: "#022c1a", fontSize: "0.9rem" }}>
-                    {note.user}
-                  </span>
-                <span style={{ fontSize: "0.75rem", color: "#047857" }}>
-                  {formatTimestamp(note.date)}
-                  </span>
+                <div
+                  style={{
+                    width: "2.6rem",
+                    height: "2.6rem",
+                    borderRadius: "9999px",
+                    background: "linear-gradient(135deg, #1f2937, #22d3ee)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontWeight: 700,
+                    fontSize: "0.95rem",
+                    color: "#e2e8f0",
+                    flexShrink: 0,
+                  }}
+                >
+                  {initials}
                 </div>
-              <p
-                style={{
-                  whiteSpace: "pre-wrap",
-                  fontSize: "0.92rem",
-                  margin: 0,
-                  color: "#000000",
-                }}
-              >
-                  {note.text}
-                </p>
+                <div
+                  style={{
+                    flex: 1,
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "0.45rem",
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "baseline",
+                      gap: "1rem",
+                    }}
+                  >
+                    <span style={{ fontWeight: 600, color: "#f1f5f9", fontSize: "0.95rem" }}>
+                      {displayName}
+                    </span>
+                    <span style={{ fontSize: "0.75rem", color: "#94a3b8" }}>
+                      {formatTimestamp(note.date)}
+                    </span>
+                  </div>
+                  <p
+                    style={{
+                      whiteSpace: "pre-wrap",
+                      fontSize: "0.95rem",
+                      margin: 0,
+                      color: "#cbd5f5",
+                      lineHeight: 1.5,
+                    }}
+                  >
+                    {note.text}
+                  </p>
+                </div>
               </div>
-            ))}
+            );
+          })}
           <div ref={notesEndRef} />
         </div>
 
@@ -2509,30 +2710,27 @@ const DayNotesModal = ({
               placeholder="Add a note…"
               style={modalTextAreaStyle}
               onFocus={(e) => {
-                e.currentTarget.style.boxShadow = "0 0 0 2px rgba(74, 222, 128, 0.35)";
+                e.currentTarget.style.boxShadow = "0 0 0 2px rgba(96, 165, 250, 0.35)";
               }}
               onBlur={(e) => {
                 e.currentTarget.style.boxShadow = "inset 0 0 0 1px rgba(15, 23, 42, 0.35)";
               }}
             ></textarea>
             <div style={{ display: "flex", justifyContent: "flex-end" }}>
-            <button
-              type="submit"
-                style={{
-                  ...modalPrimaryButtonStyle,
-                  background: "linear-gradient(135deg, #22c55e, #86efac)",
-                }}
+              <button
+                type="submit"
+                style={modalPrimaryButtonStyle}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.transform = "translateY(-1px)";
-                  e.currentTarget.style.boxShadow = "0 12px 24px rgba(34, 197, 94, 0.25)";
+                  e.currentTarget.style.boxShadow = "0 12px 24px rgba(37, 99, 235, 0.25)";
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.transform = "none";
                   e.currentTarget.style.boxShadow = "none";
                 }}
-            >
-              Add Note
-            </button>
+              >
+                Add Note
+              </button>
             </div>
           </form>
         ) : (
