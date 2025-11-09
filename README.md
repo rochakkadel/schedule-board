@@ -42,10 +42,9 @@ Target buyers include operations managers, staffing agencies, concierge teams, a
 - Real-time Firestore subscriptions for live multi-user updates
 
 **Access Control**
-- Anonymous Firebase Auth bootstrap with sign-up gated by access codes
-- Viewer / Editor roles determined by access code
-- VIP/admin flag enabling advanced tooling (settings + registered-user roster)
-- Auth state persisted in `localStorage` for fast reloads
+- Anonymous Firebase Auth bootstrap with configurable onboarding flow
+- Tiered permissions (viewer, editor, admin) driven by Firestore user records
+- Persistent auth state for immediate reloads and kiosk deployment
 
 **Insights & Integrations**
 - Deep links to Analysis dashboard (`ANALYSIS_URL`)
@@ -116,11 +115,12 @@ VITE_FIREBASE_APP_ID=...
 VITE_FIREBASE_MEASUREMENT_ID=...
 ```
 
-Optional overrides:
-- `VITE_FIREBASE_EMULATOR_HOST` if targeting local emulators
-- `VITE_ANALYSIS_URL` / `VITE_SITE_MANAGER_URL` if white-labeling
+Optional overrides (set only if you are extending the platform):
+- `VITE_FIREBASE_EMULATOR_HOST`
+- `VITE_ANALYSIS_URL`
+- `VITE_SITE_MANAGER_URL`
 
-### Run Dev Server
+### Run Dev Server (for contributors)
 ```bash
 npm run dev
 ```
@@ -151,12 +151,6 @@ Open the printed URL (defaults to `http://localhost:5173`). Hot Module Replaceme
    ```
    Adjust per your trust boundaries (e.g., role-specific claims).
 
-### Access Codes
-Access tier logic resides in `src/App.jsx`:
-- `ACCESS_CODE` – grants editor rights.
-- VIP code (`12893`) promotes user to admin (`isAdmin = true`).
-Update or externalize these constants for production; consider storing in Firestore or using custom claims for enterprise deployments.
-
 ---
 
 ## Usage Guide
@@ -164,12 +158,9 @@ Update or externalize these constants for production; consider storing in Firest
 ### Sign-Up & Roles
 1. On first load, anonymous auth provisions a UID.
 2. Click `LOGIN` to open the sign-up modal.
-3. Provide first/last name and optional access code:
-   - Blank code → viewer (read-only).
-   - `ACCESS_CODE` → editor (full CRUD).
+3. Provide first/last name and (if supplied by your administrator) an access credential to unlock editor or admin capabilities.
 
-
-User profile persists in browser storage and Firestore for reuse across sessions—ideal for kiosk environments.
+User profile persists in browser storage and Firestore for reuse across sessions—ideal for kiosks or shared terminals.
 
 ### Navigating the Week
 - `<` / `>` buttons jump weeks.
@@ -250,8 +241,9 @@ You can host the `dist` folder on any static hosting service (Netlify, Vercel, S
 - **Scaling**: App is serverless; main scaling vector is Firestore document size (keep day payloads under 1 MiB by trimming notes/comments over time).
 - **Customization**: Tailor constants in `src/App.jsx` (`DEFAULT_SITE_NAMES`, color palettes, URL endpoints) to match your brand or vertical.
 - **Security Hardening**:
-  - Replace hard-coded access codes with hashed lookups.
-  - Introduce Firebase Custom Claims for role enforcement within security rules.
+- **Customization**: Tailor constants in `src/App.jsx` (site directory, color palettes, destination URLs) to match your brand or vertical.
+- **Security Hardening**:
+  - Drive role assignment via Firestore or Firebase Custom Claims.
   - Restrict GitHub Pages domain with custom domain + HTTPS required.
 
 ---
