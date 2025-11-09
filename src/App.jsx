@@ -2,6 +2,7 @@
 
 // Import React hooks
 import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import "./App.css";
 
 // Import Firebase modules
 import { initializeApp } from "firebase/app";
@@ -489,6 +490,7 @@ const Header = ({
 
   const renderNavButton = (label, handler, fontSize) => (
     <button
+      className="micro-pressable"
       onClick={handler}
       style={{ ...navButtonStyle, fontSize: fontSize || "inherit" }}
       onMouseEnter={(e) => {
@@ -539,6 +541,7 @@ const Header = ({
         }}
       >
         <button
+          className="micro-pressable micro-pill"
           type="button"
           onClick={onOpenAnalysis}
           style={linkButtonStyle}
@@ -556,6 +559,7 @@ const Header = ({
           Analysis
         </button>
         <button
+          className="micro-pressable micro-pill"
           type="button"
           onClick={onOpenSiteManager}
           style={linkButtonStyle}
@@ -711,6 +715,7 @@ const Header = ({
           </div>
         ) : (
           <button
+            className="micro-pressable"
             onClick={onSignUp}
             style={{
               padding: "0.5rem 1rem",
@@ -769,6 +774,11 @@ const Shift = ({ shift, onContextMenu, onDoubleClick }) => {
   };
 
   const hasComments = comments && comments.length > 0;
+  const shiftStatusClass = isComplete
+    ? " shift-complete"
+    : isOps
+    ? " shift-ops"
+    : "";
 
   return (
     <div
@@ -778,7 +788,7 @@ const Shift = ({ shift, onContextMenu, onDoubleClick }) => {
         onContextMenu(e, shift);
       }}
       onDoubleClick={() => onDoubleClick(shift)}
-      className="shift-item p-2 rounded-md cursor-pointer select-none mb-2"
+      className={`shift-item p-2 rounded-md cursor-pointer select-none mb-2${shiftStatusClass}`}
       style={{
         padding: "0.65rem",
         borderRadius: "0.5rem",
@@ -947,9 +957,9 @@ const DayColumn = ({
       >
         {hasAccess && (
           <button
+            className="flex-grow py-2 text-center text-gray-400 font-bold text-xl rounded-md hover:bg-white hover:text-black transition-colors duration-150 plus-button micro-pressable"
             onClick={onAddShift}
             onContextMenu={onPasteMenu}
-            className="flex-grow py-2 text-center text-gray-400 font-bold text-xl rounded-md hover:bg-white hover:text-black transition-colors duration-150"
             style={{
               flexGrow: 1,
               padding: "0.5rem 0",
@@ -975,6 +985,7 @@ const DayColumn = ({
           </button>
         )}
         <button
+          className="note-button micro-pressable"
           onClick={onDayNotes}
           style={{
             padding: "0.5rem",
@@ -1127,6 +1138,7 @@ const PasteMenu = ({ menuState, onClose, onPaste }) => {
   return (
     <div
       ref={menuRef}
+      className="paste-menu"
       style={{
         top: menuState.y,
         left: menuState.x,
@@ -1178,7 +1190,7 @@ const Modal = ({ children, onClose }) => {
   const modalRef = useClickOutside(onClose);
   return (
     <div
-      className="fixed inset-0 z-40 flex items-center justify-center bg-black bg-opacity-75"
+      className="fixed inset-0 z-40 flex items-center justify-center bg-black bg-opacity-75 modal-backdrop"
       style={{
         position: "fixed",
         inset: 0,
@@ -1194,7 +1206,7 @@ const Modal = ({ children, onClose }) => {
     >
       <div
         ref={modalRef}
-        className="bg-black border border-white p-6 rounded-lg shadow-xl w-full max-w-md"
+        className="bg-black border border-white p-6 rounded-lg shadow-xl w-full max-w-md modal-panel"
         style={{
           backgroundColor: "#000000",
           border: "1px solid #FFFFFF",
@@ -2090,7 +2102,7 @@ const SignUpModal = ({ onClose, onSignUp }) => {
             value={accessCode}
             onChange={(e) => setAccessCode(e.target.value)}
               style={modalInputStyle}
-              placeholder="OPTIONAL, ADMIN ACCES"
+              placeholder="OPTIONAL, EDITOR OR ADMIN LEVEL ACCES"
           />
             <p
               style={{
@@ -2235,10 +2247,10 @@ const CommentModal = ({
             flexDirection: "column",
             gap: "0.9rem",
             padding: "1rem",
-            background: "linear-gradient(180deg, rgba(15,23,42,0.75), rgba(15,23,42,0.35))",
+            backgroundColor: "#064e3b",
             borderRadius: "1rem",
-            border: "1px solid rgba(148, 163, 184, 0.18)",
-            boxShadow: "inset 0 0 0 1px rgba(15, 23, 42, 0.35)",
+            border: "1px solid rgba(110, 231, 183, 0.75)",
+            boxShadow: "0 18px 36px rgba(2, 6, 23, 0.55)",
           }}
         >
           {comments.length === 0 && (
@@ -2256,14 +2268,14 @@ const CommentModal = ({
             <div
               key={comment.id}
               style={{
-                backgroundColor: "rgba(30, 64, 175, 0.18)",
-                border: "1px solid rgba(96, 165, 250, 0.25)",
+                backgroundColor: "#22c55e",
+                border: "1px solid rgba(187, 247, 208, 0.9)",
                 borderRadius: "0.9rem",
-                padding: "0.75rem 0.9rem",
-                color: "#e2e8f0",
+                padding: "0.9rem 1rem",
+                color: "#0f172a",
                 display: "flex",
                 flexDirection: "column",
-                gap: "0.3rem",
+                gap: "0.45rem",
               }}
             >
               <div
@@ -2274,10 +2286,10 @@ const CommentModal = ({
                   gap: "0.5rem",
                 }}
               >
-                <span style={{ fontWeight: 600, color: "#60a5fa", fontSize: "0.9rem" }}>
+                <span style={{ fontWeight: 700, color: "#022c1a", fontSize: "0.9rem" }}>
                     {comment.user}
                   </span>
-                <span style={{ fontSize: "0.75rem", color: "#94a3b8" }}>
+                <span style={{ fontSize: "0.75rem", color: "#065f46" }}>
                   {formatTimestamp(comment.date)}
                   </span>
                 </div>
@@ -2286,7 +2298,7 @@ const CommentModal = ({
                   whiteSpace: "pre-wrap",
                   fontSize: "0.92rem",
                   margin: 0,
-                  color: "#f8fafc",
+                  color: "#04120c",
                 }}
               >
                   {comment.text}
@@ -2424,10 +2436,10 @@ const DayNotesModal = ({
             flexDirection: "column",
             gap: "0.9rem",
             padding: "1rem",
-            background: "linear-gradient(180deg, rgba(6,78,59,0.55), rgba(6,78,59,0.25))",
+            backgroundColor: "#064e3b",
             borderRadius: "1rem",
-            border: "1px solid rgba(74, 222, 128, 0.25)",
-            boxShadow: "inset 0 0 0 1px rgba(15, 23, 42, 0.35)",
+            border: "1px solid rgba(134, 239, 172, 0.85)",
+            boxShadow: "0 18px 36px rgba(2, 6, 23, 0.55)",
           }}
         >
           {dayNotes.length === 0 && (
@@ -2445,14 +2457,14 @@ const DayNotesModal = ({
             <div
               key={note.id}
               style={{
-                backgroundColor: "rgba(22, 163, 74, 0.18)",
-                border: "1px solid rgba(74, 222, 128, 0.25)",
+                backgroundColor: "#22c55e",
+                border: "1px solid rgba(187, 247, 208, 0.95)",
                 borderRadius: "0.9rem",
-                padding: "0.75rem 0.9rem",
-                color: "#e2e8f0",
+                padding: "0.9rem 1rem",
+                color: "#000000",
                 display: "flex",
                 flexDirection: "column",
-                gap: "0.3rem",
+                gap: "0.45rem",
               }}
             >
               <div
@@ -2463,10 +2475,10 @@ const DayNotesModal = ({
                   gap: "0.5rem",
                 }}
               >
-                <span style={{ fontWeight: 600, color: "#4ade80", fontSize: "0.9rem" }}>
+                <span style={{ fontWeight: 700, color: "#022c1a", fontSize: "0.9rem" }}>
                     {note.user}
                   </span>
-                <span style={{ fontSize: "0.75rem", color: "#a7f3d0" }}>
+                <span style={{ fontSize: "0.75rem", color: "#047857" }}>
                   {formatTimestamp(note.date)}
                   </span>
                 </div>
@@ -2475,7 +2487,7 @@ const DayNotesModal = ({
                   whiteSpace: "pre-wrap",
                   fontSize: "0.92rem",
                   margin: 0,
-                  color: "#f8fafc",
+                  color: "#000000",
                 }}
               >
                   {note.text}

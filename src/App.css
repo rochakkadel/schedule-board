@@ -1,5 +1,172 @@
-/* App-specific styles - overridden by Tailwind in most cases */
+/* App-specific animations & interaction polish */
 #root {
   width: 100%;
   min-height: 100vh;
+}
+
+:root {
+  --micro-ease: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes micro-fade-in {
+  0% {
+    opacity: 0;
+    transform: translateY(6px) scale(0.98);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes micro-backdrop {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 10;
+  }
+}
+
+@keyframes shift-entry {
+  0% {
+    opacity: 0;
+    transform: translateY(8px) scale(0.95);
+  }
+  60% {
+    opacity: 1;
+    transform: translateY(-2px) scale(1.02);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes status-pop {
+  0% {
+    transform: scale(0.92);
+    box-shadow: 0 0 0 0 rgba(37, 211, 102, 0.25);
+  }
+  70% {
+    transform: scale(1.04);
+    box-shadow: 0 0 0 12px rgba(37, 211, 102, 0);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: none;
+  }
+}
+
+@keyframes status-ops {
+  0% {
+    transform: scale(0.92);
+    box-shadow: 0 0 0 0 rgba(96, 165, 250, 0.25);
+  }
+  70% {
+    transform: scale(1.04);
+    box-shadow: 0 0 0 12px rgba(96, 165, 250, 0);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: none;
+  }
+}
+
+.micro-pressable {
+  transition: transform 0.18s var(--micro-ease), box-shadow 0.18s var(--micro-ease),
+    filter 0.18s ease, background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.micro-pressable:hover {
+  transform: translateY(-2px) scale(1.01);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.35);
+}
+
+.micro-pressable:active {
+  transform: scale(0.97);
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.45);
+}
+
+.micro-pill {
+  will-change: transform, box-shadow;
+}
+
+.shift-item {
+  animation: shift-entry 0.4s var(--micro-ease);
+  transition: transform 0.18s var(--micro-ease), box-shadow 0.2s var(--micro-ease),
+    background-color 0.25s ease, border-color 0.25s ease, filter 0.25s ease;
+  transform-origin: center;
+}
+
+.shift-item:hover {
+  transform: translateY(-4px) scale(1.015);
+  box-shadow: 0 16px 30px rgba(2, 6, 23, 0.45);
+  filter: brightness(1.03);
+}
+
+.shift-item:active {
+  transform: scale(0.985);
+}
+
+.shift-item.shift-complete {
+  animation: status-pop 0.45s var(--micro-ease);
+}
+
+.shift-item.shift-ops {
+  animation: status-ops 0.45s var(--micro-ease);
+}
+
+.day-column-content {
+  scroll-behavior: smooth;
+}
+
+.day-column-content::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+.context-menu {
+  animation: micro-fade-in 0.22s var(--micro-ease);
+  transform-origin: top left;
+}
+
+.paste-menu {
+  animation: micro-fade-in 0.22s var(--micro-ease);
+  transform-origin: top left;
+}
+
+.modal-backdrop {
+  animation: micro-backdrop 0.75s ease-out forwards;
+}
+
+.modal-panel {
+  animation: micro-fade-in 0.32s var(--micro-ease);
+  transform-origin: center;
+}
+
+.note-button {
+  transition: transform 0.18s var(--micro-ease), box-shadow 0.2s var(--micro-ease);
+}
+
+.note-button:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 10px 22px rgba(59, 130, 246, 0.25);
+}
+
+.note-button:active {
+  transform: scale(0.96);
+  box-shadow: none;
+}
+
+.plus-button {
+  animation: shift-entry 0.4s var(--micro-ease);
+}
+
+.plus-button:hover {
+  transform: translateY(-2px);
+}
+
+.plus-button:active {
+  transform: scale(0.96);
 }
