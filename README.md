@@ -167,7 +167,7 @@ Update or externalize these constants for production; consider storing in Firest
 3. Provide first/last name and optional access code:
    - Blank code → viewer (read-only).
    - `ACCESS_CODE` → editor (full CRUD).
-   - `12893` → admin (editor + registered-users management).
+
 
 User profile persists in browser storage and Firestore for reuse across sessions—ideal for kiosk environments.
 
