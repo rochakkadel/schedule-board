@@ -146,7 +146,7 @@ const COLOR_COMPLETE_FONT = "#FFFFFF"; // White
 const COLOR_OPS_BG = "#6495ED"; // Lighter Blue
 const COLOR_OPS_FONT = "#FFFFFF"; // White
 const ANALYSIS_URL =
-  "https://xxxrkxxxrkxxx-ui.github.io/Analysis/?reportId=ipyvgB5vn4FqlEOxTgIL";
+  "https://xxxrkxxxrkxxx-ui.github.io/Analysis/";
 const SITE_MANAGER_URL =
   "https://xxxrkxxxrkxxx-ui.github.io/KadelSiteManager/";
 const SITE_DIRECTORY_DOC_PATH = [
