@@ -612,10 +612,11 @@ const Header = ({
     letterSpacing: "0.06em",
   };
 
-  const openLegalOverview = useCallback(() => {
+  const openLegalOverview = useCallback
+  (() => {
     if (typeof window !== "undefined") {
       window.open(
-        "https://github.com/rochakkadel/schedule-board/blob/dc00467ff6f8f9eb3ced2b58cf83a347d978e4a9/LEGAL_AND_TECH_OVERVIEW.md",
+        "https://github.com/rochakkadel/schedule-board/blob/056f389fdf0c40ecbff80f6f3ccf099c74e304cd/LEGAL_AND_TECH_OVERVIEW.md",
         "_blank",
         "noopener,noreferrer"
       );
