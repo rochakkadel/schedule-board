@@ -458,8 +458,6 @@ const Header = ({
   showSettings,
   onOpenSettings,
   onLogout,
-  onScrollUp,
-  onScrollDown,
 }) => {
   const [isAvatarMenuOpen, setIsAvatarMenuOpen] = useState(false);
   const avatarMenuRef = useClickOutside(() => setIsAvatarMenuOpen(false));
@@ -473,20 +471,6 @@ const Header = ({
     fontWeight: "bold",
     cursor: "pointer",
     transition: "background-color 0.15s ease",
-  };
-
-  const verticalButtonStyle = {
-    width: "1.65rem",
-    height: "1.65rem",
-    borderRadius: "0.5rem",
-    border: "1px solid rgba(148,163,184,0.45)",
-    backgroundColor: "rgba(15,23,42,0.65)",
-    color: "#e2e8f0",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    cursor: "pointer",
-    transition: "border 0.15s ease, transform 0.15s ease",
   };
 
   const linkButtonStyle = {
@@ -545,47 +529,6 @@ const Header = ({
         {renderNavButton("ts week", onToday, "0.875rem")}
         {renderNavButton(">", onNextWeek)}
         {renderNavButton(<CalendarIcon />, onOpenCalendar)}
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            gap: "0.35rem",
-            marginLeft: "0.35rem",
-          }}
-        >
-        <button
-            type="button"
-            onClick={onScrollUp}
-            style={{ ...verticalButtonStyle }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.border = "1px solid rgba(96,165,250,0.75)";
-              e.currentTarget.style.transform = "translateY(-1px)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.border = "1px solid rgba(148,163,184,0.45)";
-              e.currentTarget.style.transform = "none";
-            }}
-            aria-label="Scroll up"
-          >
-            <ArrowUpIcon />
-        </button>
-        <button
-            type="button"
-            onClick={onScrollDown}
-            style={{ ...verticalButtonStyle }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.border = "1px solid rgba(96,165,250,0.75)";
-              e.currentTarget.style.transform = "translateY(1px)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.border = "1px solid rgba(148,163,184,0.45)";
-              e.currentTarget.style.transform = "none";
-            }}
-            aria-label="Scroll down"
-          >
-            <ArrowDownIcon />
-        </button>
-        </div>
       </div>
 
       <div
@@ -635,9 +578,21 @@ const Header = ({
         style={{
           display: "flex",
           alignItems: "center",
-          gap: "0.9rem",
+          gap: "0.6rem",
         }}
       >
+        <span
+          style={{
+            color: "#ffffff",
+            fontSize: "0.62rem",
+            letterSpacing: "0.08em",
+            textTransform: "uppercase",
+            textShadow: "0 0 6px rgba(255, 191, 0, 0.75)",
+            fontWeight: 500,
+          }}
+        >
+          © 2025 Rochak Kadel. All rights reserved
+        </span>
         {userInfo ? (
           <div
             ref={avatarMenuRef}
@@ -1464,7 +1419,7 @@ const AddShiftModal = ({
                 backgroundColor: "rgba(239, 68, 68, 0.15)",
                 color: "#fca5a5",
                 fontSize: "0.85rem",
-              }}
+              }} 
             >
               {error}
             </div>
@@ -2752,38 +2707,6 @@ const ArrowRightIcon = () => (
     />
   </svg>
 );
-const ArrowUpIcon = () => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    className="h-4 w-4"
-    fill="none"
-    viewBox="0 0 24 24"
-    stroke="currentColor"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={2}
-      d="M5 15l7-7 7 7"
-    />
-  </svg>
-);
-const ArrowDownIcon = () => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    className="h-4 w-4"
-    fill="none"
-    viewBox="0 0 24 24"
-    stroke="currentColor"
-  >
-    <path
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth={2}
-      d="M19 9l-7 7-7-7"
-    />
-  </svg>
-);
 const CalendarIcon = () => (
   <span role="img" aria-label="Calendar" style={{ fontSize: "1.15rem", lineHeight: 1 }}>
     🗓️
@@ -2855,36 +2778,6 @@ const App = () => {
       window.open(SITE_MANAGER_URL, "_blank", "noopener,noreferrer");
     }
   }, []);
-
-  const scrollColumnsBy = useCallback(
-     (delta) => {
-      const container = boardScrollRef.current;
-      const columns = container
-        ? container.querySelectorAll(".day-column-content")
-        : document.querySelectorAll(".day-column-content");
-      if (!columns.length) return;
-      syncScrollRef.current = true;
-      columns.forEach((col) => {
-        const nextTop = Math.max(
-          0,
-          Math.min(col.scrollHeight - col.clientHeight, col.scrollTop + delta)
-        );
-        col.scrollTo({ top: nextTop, behavior: "smooth" });
-      });
-      requestAnimationFrame(() => {
-        syncScrollRef.current = false;
-      });
-    },
-    []
-  );
-
-  const handleScrollUp = useCallback(() => {
-    scrollColumnsBy(-180);
-  }, [scrollColumnsBy]);
-
-  const handleScrollDown = useCallback(() => {
-    scrollColumnsBy(180);
-  }, [scrollColumnsBy]);
 
   useEffect(() => {
     if (!db) return;
@@ -3453,8 +3346,6 @@ const App = () => {
         showSettings={Boolean(userInfo?.isAdmin)}
         onOpenSettings={openRegisteredUsersModal}
         onLogout={handleLogout}
-        onScrollUp={handleScrollUp}
-        onScrollDown={handleScrollDown}
       />
 
       {/* Schedule Board */}
