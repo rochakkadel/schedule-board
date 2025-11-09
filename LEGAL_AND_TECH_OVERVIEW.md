@@ -12,9 +12,9 @@ Schedule Board is a web-based workforce planning and shift management tool built
 
 ## 2. Ownership & Intellectual Property
 
-- **Copyright Ownership:** All original source code, user interface assets, copy, and documentation are owned by the Schedule Board development team unless otherwise noted.
+- **Copyright Ownership:** All original source code, user interface assets, copy, and documentation is owned by Rochak Kadel unless otherwise noted.
 - **Third-Party Assets:** Open-source libraries and frameworks are incorporated under their respective licenses (see §8). Any external artwork, fonts, or icons remain the property of their creators and are used according to applicable license terms.
-- **Trademark Usage:** “Schedule Board” and associated branding are trademarks owned by the project owners. Unauthorized use of branding elements is prohibited.
+- **Trademark Usage:** “Schedule Board” and associated branding are trademarks owned by the project owner. Unauthorized use of branding elements is prohibited.
 - **Contributor IP:** Contributors grant the project a perpetual, worldwide, non-exclusive, royalty-free license to use submitted code, documentation, and assets.
 
 ---
@@ -61,7 +61,7 @@ This document does not constitute legal advice; consult qualified counsel to eva
 ## 7. Feature Overview
 
 - **Schedule Grid:** Drag-and-drop style weekly calendar with shift creation, editing, and deletion workflows.
-- **User Access Modes:** View-only access by default; edit privileges unlocked with approved access codes (`91965` for editors, `12893` for VIP/admin).
+- **User Access Modes:** View-only access by default; edit privileges unlocked with approved access codes 
 - **Shift Metadata:** Support for time ranges, site assignments, color-coding, comments, and status flags (complete, operations).
 - **Notes & Comments:** High-contrast modal interfaces for team collaboration on daily notes and per-shift comments.
 - **Contextual Menus:** Right-click menus enabling quick edits, duplication, color adjustments, and completion toggles.
@@ -99,9 +99,7 @@ Third-party dependencies are managed via `package.json`. Refer to the dependency
 ## 10. Support & Maintenance
 
 - **Issue Tracking:** Maintain a ticketing system (GitHub Issues, Jira) for feature requests and bug reports.
-- **Release Notes:** Document notable changes, migrations, and security fixes. Adopt semantic versioning for clarity.
-- **Testing:** Implement unit tests for core utilities and integration tests for Firebase interactions where possible.
-- **Documentation:** Keep README, onboarding guides, and this legal overview up to date with each release.
+
 
 ---
 
@@ -123,10 +121,7 @@ Third-party dependencies are managed via `package.json`. Refer to the dependency
 
 ## 13. Contact & Escalation
 
-- **General Inquiries:** contact@scheduleboard.app (placeholder; replace with official address).
-- **Legal Notices:** legal@scheduleboard.app.
-- **Security Reports:** security@scheduleboard.app (PGP public key recommended for sensitive disclosures).
-- **Emergency Hotline:** +1-555-555-1212 (placeholder; substitute with actual escalation line if available).
+- **General Inquiries:** rochakrajkadel@gmail.com
 
 ---
 
@@ -134,9 +129,9 @@ Third-party dependencies are managed via `package.json`. Refer to the dependency
 
 | Date | Version | Author | Notes |
 |---|---|---|---|
-| 2025-11-09 | 1.0 | Schedule Board Team | Initial creation of legal, technical, and feature overview. |
+| 2025-11-09 | 1.0 | Rochak Kadel | Initial creation of legal, technical, and feature overview. |
 
 ---
 
-*This document is a living artifact. Ensure stakeholders review and update it alongside product releases, legal guidance, and infrastructure changes.*
+
 
