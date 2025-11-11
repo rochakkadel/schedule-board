@@ -272,6 +272,13 @@ const getStartOfWeek = (date) => {
   return new Date(d.setDate(diff));
 };
 
+const getDateKey = (date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
 /**
  * Gets a unique week ID in 'YYYY-WW' format.
  */
@@ -3069,7 +3076,7 @@ const App = () => {
     const start = getStartOfWeek(currentDate);
     return getWeekDays(start).map((date) => ({
       date,
-      dateString: date.toISOString().split("T")[0],
+      dateString: getDateKey(date),
     }));
   }, [currentDate]);
 
@@ -3109,7 +3116,8 @@ const App = () => {
               (d) => d.date === day.dateString
             );
             return {
-              date: day.date,
+              date: new Date(day.date),
+              dateString: day.dateString,
               shifts: matchingDay ? matchingDay.shifts : [],
               notes: matchingDay ? matchingDay.notes : [], // Add notes
             };
@@ -3117,7 +3125,8 @@ const App = () => {
           setWeekData({ days: daysWithData });
         } else {
           const blankWeek = weekDays.map((day) => ({
-            date: day.date,
+            date: new Date(day.date),
+            dateString: day.dateString,
             shifts: [],
             notes: [], // Add notes
           }));
@@ -3173,7 +3182,7 @@ const App = () => {
       console.error("Cannot update shift, DB not connected.");
       return;
     }
-    const dayString = day.date.toISOString().split("T")[0];
+    const dayString = getDateKey(day.date);
     const currentDays = await getWeekDoc();
     const dayIndex = currentDays.findIndex((d) => d.date === dayString);
 
@@ -3202,7 +3211,7 @@ const App = () => {
       console.error("Cannot delete shift, DB not connected.");
       return;
     }
-    const dayString = day.date.toISOString().split("T")[0];
+    const dayString = getDateKey(day.date);
     const currentDays = await getWeekDoc();
     const dayIndex = currentDays.findIndex((d) => d.date === dayString);
 
@@ -3230,7 +3239,7 @@ const App = () => {
     // Create a new shift object with a new ID
     const newShift = { ...clipboard, id: crypto.randomUUID() };
 
-    const dayString = day.date.toISOString().split("T")[0];
+    const dayString = getDateKey(day.date);
     const currentDays = await getWeekDoc();
     const dayIndex = currentDays.findIndex((d) => d.date === dayString);
 
@@ -3255,7 +3264,7 @@ const App = () => {
       console.error("Cannot update notes, DB not connected.");
       return;
     }
-    const dayString = day.date.toISOString().split("T")[0];
+    const dayString = getDateKey(day.date);
     const currentDays = await getWeekDoc();
     const dayIndex = currentDays.findIndex((d) => d.date === dayString);
 
@@ -3277,7 +3286,7 @@ const App = () => {
       console.error("Cannot add shift, DB not connected.");
       return;
     }
-    const dayString = day.date.toISOString().split("T")[0];
+    const dayString = getDateKey(day.date);
     const currentDays = await getWeekDoc();
     const dayIndex = currentDays.findIndex((d) => d.date === dayString);
 
@@ -3644,7 +3653,7 @@ const App = () => {
               const hasNotes = day.notes && day.notes.length > 0;
               return (
                   <DayColumn
-                  key={day.date.toISOString()}
+                  key={day.dateString || getDateKey(day.date)}
                     day={day}
                     shifts={day.shifts}
                     hasAccess={hasAccess}
