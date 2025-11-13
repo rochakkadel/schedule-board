@@ -137,6 +137,12 @@ const DEFAULT_SITE_NAMES = [
   "1019 Market",
    "Sutro Tower",
   "425 Market",
+  "A.Shaef Breaks (717M, 240S, 115S)",
+  "A.Hayes Breaks (425C, 101M, 153K, 150P)",
+  "Y.Perez Breaks (71S, 1019M, 90NM, 30G)",
+  "I.Anwar Breaks (210P, 30ML, 111P)",
+  "E.Walin Breaks (750B, 222K, 230C)",
+  "M.Horn Breaks (26O, 101M, 110S, 1K)",
   
 ];
 const FONT_COLORS = ["#000000", "#FFFFFF", "#FF0000"]; // black, white, red
