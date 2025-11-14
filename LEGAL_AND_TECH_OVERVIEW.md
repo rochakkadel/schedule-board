@@ -15,13 +15,6 @@ The application stores schedule data, user profiles, and comments in Firebase Fi
 
 Data is encrypted in transit and at rest by Firebase. User profiles are cached locally for offline functionality.
 
-Organizations deploying this application are responsible for:
-- Configuring Firebase security rules appropriately
-- Complying with applicable privacy regulations (GDPR, CCPA, HIPAA, etc.)
-- Providing privacy notices to end users
-- Implementing data retention and deletion policies
-- Establishing incident response procedures
-
 ## Features
 
 - Weekly calendar view for shift management
