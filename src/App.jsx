@@ -146,7 +146,7 @@ const DEFAULT_SITE_NAMES = [
   
 ];
 const FONT_COLORS = ["#000000", "#FFFFFF", "#FF0000"]; // black, white, red
-const FILL_COLORS = ["#FFFFFF", "#008000", "#0000FF", "#000000", "#FFA500"]; // white, green, blue, black, orange
+const FILL_COLORS = ["#FFFFFF", "#008000", "#0000FF", "#000000", "#FFA500", "#800080"]; // white, green, blue, black, orange, purple
 
 const COLOR_COMPLETE_BG = "#32CD32"; // Lighter Green
 const COLOR_COMPLETE_FONT = "#FFFFFF"; // White
@@ -207,7 +207,7 @@ const extractInitials = (displayString = "") => {
 // --- Shared Styling Helpers ---
 const modalLabelStyle = {
   display: "block",
-  fontSize: "0.75rem",
+  fontSize: "0.85rem",
   fontWeight: 600,
   letterSpacing: "0.04em",
   textTransform: "uppercase",
@@ -222,7 +222,7 @@ const modalInputStyle = {
   border: "1px solid rgba(148, 163, 184, 0.35)",
   backgroundColor: "rgba(15, 23, 42, 0.55)",
   color: "#f8fafc",
-  fontSize: "0.95rem",
+  fontSize: "1.05rem",
   outline: "none",
   boxShadow: "inset 0 0 0 1px rgba(15, 23, 42, 0.35)",
   transition: "box-shadow 0.15s ease, border 0.15s ease",
@@ -235,7 +235,7 @@ const modalPrimaryButtonStyle = {
   background: "linear-gradient(135deg, #2563eb, #60a5fa)",
   color: "#f8fafc",
   fontWeight: 600,
-  fontSize: "0.95rem",
+  fontSize: "1.05rem",
   cursor: "pointer",
   transition: "transform 0.15s ease, box-shadow 0.15s ease",
 };
@@ -247,7 +247,7 @@ const modalSecondaryButtonStyle = {
   backgroundColor: "rgba(15, 23, 42, 0.65)",
   color: "#e2e8f0",
   fontWeight: 500,
-  fontSize: "0.95rem",
+  fontSize: "1.05rem",
   cursor: "pointer",
   transition: "border 0.15s ease, color 0.15s ease",
 };
@@ -260,7 +260,7 @@ const modalTextAreaStyle = {
   border: "1px solid rgba(148, 163, 184, 0.35)",
   backgroundColor: "rgba(15, 23, 42, 0.55)",
   color: "#f8fafc",
-  fontSize: "0.95rem",
+  fontSize: "1.05rem",
   resize: "vertical",
   outline: "none",
   boxShadow: "inset 0 0 0 1px rgba(15, 23, 42, 0.35)",
@@ -574,6 +574,167 @@ const useClickOutside = (callback) => {
 // --- Sub-Components ---
 
 /**
+ * Leaderboard Component
+ */
+const Leaderboard = ({ weekData }) => {
+  const leaderboardData = useMemo(() => {
+    const shiftCounts = {};
+    
+    // Count filled shifts by initials for the current week
+    // A shift is considered "filled" if it has a bgColor that's not white/default
+    weekData.days?.forEach((day) => {
+      day.shifts?.forEach((shift) => {
+        if (shift.initials && shift.initials.trim()) {
+          const bgColor = shift.bgColor || "#FFFFFF";
+          const normalizedBg = bgColor.toUpperCase();
+          // Count if shift has a fill color (not white/default)
+          const isFilled = normalizedBg !== "#FFFFFF" && normalizedBg !== "FFFFFF";
+          
+          if (isFilled) {
+            const initials = shift.initials.trim().toUpperCase();
+            shiftCounts[initials] = (shiftCounts[initials] || 0) + 1;
+          }
+        }
+      });
+    });
+    
+    // Convert to array and sort by count (descending)
+    return Object.entries(shiftCounts)
+      .map(([initials, count]) => ({ initials, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10); // Top 10
+  }, [weekData]);
+
+  if (leaderboardData.length === 0) {
+    return null;
+  }
+
+  const getTrophyIcon = (index) => {
+    if (index === 0) {
+      return "🏆"; // Trophy (Titan style)
+    } else if (index === 1) {
+      return "🥇"; // Gold Medal
+    } else if (index === 2) {
+      return "🥈"; // Silver Medal
+    }
+    return null;
+  };
+
+  const getTrophyColor = (index) => {
+    if (index === 0) {
+      return "#8B5CF6"; // Titan (Purple/Violet)
+    } else if (index === 1) {
+      return "#FFD700"; // Gold
+    } else if (index === 2) {
+      return "#C0C0C0"; // Silver
+    }
+    return "#94a3b8";
+  };
+
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: "0.5rem",
+        padding: "0.5rem 0.75rem",
+        backgroundColor: "rgba(15, 23, 42, 0.65)",
+        borderRadius: "0.5rem",
+        border: "1px solid rgba(148, 163, 184, 0.25)",
+      }}
+    >
+      <div
+        style={{
+          fontSize: "0.7rem",
+          fontWeight: 600,
+          color: "#94a3b8",
+          textTransform: "uppercase",
+          letterSpacing: "0.05em",
+          whiteSpace: "nowrap",
+        }}
+      >
+      </div>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "0.4rem",
+          flexWrap: "wrap",
+        }}
+      >
+        {leaderboardData.map((item, index) => (
+          <div
+            key={item.initials}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "0.25rem",
+              padding: "0.25rem 0.5rem",
+              position: "relative",
+              backgroundColor: index === 0 
+                ? "rgba(139, 92, 246, 0.2)" 
+                : index === 1
+                ? "rgba(255, 215, 0, 0.15)"
+                : index === 2
+                ? "rgba(192, 192, 192, 0.15)"
+                : "rgba(148, 163, 184, 0.1)",
+              borderRadius: "0.375rem",
+              border: index === 0 
+                ? "2px solid rgba(139, 92, 246, 0.7)" 
+                : index === 1
+                ? "1px solid rgba(255, 215, 0, 0.4)"
+                : index === 2
+                ? "1px solid rgba(192, 192, 192, 0.4)"
+                : "1px solid rgba(148, 163, 184, 0.2)",
+            }}
+          >
+            {getTrophyIcon(index) && (
+              <span 
+                style={{ 
+                  fontSize: index === 0 ? "1.1rem" : "0.9rem",
+                  ...(index === 0 && {
+                    filter: "drop-shadow(0 0 8px rgba(139, 92, 246, 1)) drop-shadow(0 0 16px rgba(124, 58, 237, 0.8)) drop-shadow(0 0 24px rgba(109, 40, 217, 0.6))",
+                    animation: "titanShine 2.5s ease-in-out infinite",
+                  }),
+                  ...(index === 1 && {
+                    filter: "drop-shadow(0 0 4px rgba(255, 215, 0, 0.9)) drop-shadow(0 0 8px rgba(255, 193, 7, 0.7)) drop-shadow(0 0 12px rgba(255, 152, 0, 0.5))",
+                    animation: "goldGlow 2s ease-in-out infinite alternate",
+                  }),
+                  ...(index === 2 && {
+                    filter: "drop-shadow(0 0 4px rgba(192, 192, 192, 0.9)) drop-shadow(0 0 8px rgba(169, 169, 169, 0.7)) drop-shadow(0 0 12px rgba(128, 128, 128, 0.5))",
+                    animation: "silverGlow 2s ease-in-out infinite alternate",
+                  }),
+                }}
+              >
+                {getTrophyIcon(index)}
+              </span>
+            )}
+            <span
+              style={{
+                fontSize: "0.8rem",
+                fontWeight: 700,
+                color: getTrophyColor(index),
+              }}
+            >
+              {item.initials}
+            </span>
+            <span
+              style={{
+                fontSize: "0.7rem",
+                color: getTrophyColor(index),
+                fontWeight: 600,
+              }}
+            >
+              {item.count}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+/**
  * Header Component
  */
 const Header = ({
@@ -589,7 +750,9 @@ const Header = ({
   showSettings,
   onOpenSettings,
   onLogout,
+  weekData,
 }) => {
+  const isAdmin = Boolean(userInfo?.isAdmin);
   const [isAvatarMenuOpen, setIsAvatarMenuOpen] = useState(false);
   const avatarMenuRef = useClickOutside(() => setIsAvatarMenuOpen(false));
 
@@ -600,6 +763,7 @@ const Header = ({
     color: "#ffffff",
     borderRadius: "0.375rem",
     fontWeight: "bold",
+    fontSize: "1.05rem",
     cursor: "pointer",
     transition: "background-color 0.15s ease",
   };
@@ -610,7 +774,7 @@ const Header = ({
     border: "1px solid rgba(148, 163, 184, 0.45)",
     backgroundColor: "rgba(15, 23, 42, 0.65)",
     color: "#e2e8f0",
-    fontSize: "0.82rem",
+    fontSize: "0.92rem",
     letterSpacing: "0.05em",
     textTransform: "uppercase",
     fontWeight: 600,
@@ -621,7 +785,7 @@ const Header = ({
   const legalButtonStyle = {
     ...linkButtonStyle,
     padding: "0.4rem 0.85rem",
-    fontSize: "0.75rem",
+    fontSize: "0.85rem",
     letterSpacing: "0.06em",
   };
 
@@ -676,9 +840,10 @@ const Header = ({
         }}
       >
         {renderNavButton("<", onPrevWeek)}
-        {renderNavButton("ts week", onToday, "0.875rem")}
+        {renderNavButton("This Week", onToday, "0.98rem")}
         {renderNavButton(">", onNextWeek)}
         {renderNavButton(<CalendarIcon />, onOpenCalendar)}
+        <Leaderboard weekData={weekData} />
       </div>
 
       <div
@@ -762,7 +927,7 @@ const Header = ({
           <span
             style={{
               color: "#ffffff",
-              fontSize: "0.62rem",
+              fontSize: "0.70rem",
               letterSpacing: "0.08em",
               textTransform: "uppercase",
               textShadow: "0 0 6px rgba(255, 191, 0, 0.75)",
@@ -789,19 +954,44 @@ const Header = ({
                 width: "2.5rem",
                 height: "2.5rem",
                 borderRadius: "50%",
-                border: "2px solid #ffffff",
-                backgroundColor: hasAccess ? "#2563eb" : "rgba(59,130,246,0.45)",
+                border: isAdmin ? "3px solid rgba(255, 215, 0, 0.8)" : "2px solid #ffffff",
+                background: isAdmin 
+                  ? "linear-gradient(135deg, rgba(255, 215, 0, 0.3) 0%, rgba(255, 193, 7, 0.2) 50%, rgba(255, 215, 0, 0.3) 100%)"
+                  : hasAccess 
+                  ? "#2563eb" 
+                  : "rgba(59,130,246,0.45)",
                 color: "#ffffff",
                 fontWeight: "bold",
-                fontSize: "0.95rem",
+                fontSize: isAdmin ? "1.3rem" : "1.05rem",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 cursor: "pointer",
+                position: "relative",
+                overflow: "hidden",
+                ...(isAdmin && {
+                  boxShadow: "0 0 10px rgba(255, 215, 0, 0.6), 0 0 20px rgba(255, 193, 7, 0.4), inset 0 0 20px rgba(255, 215, 0, 0.2)",
+                  animation: "adminAvatarFade 4s ease-in-out infinite",
+                }),
               }}
               title={hasAccess ? "Editor Access" : "Viewer Access"}
             >
             {userInfo.initials}
+            {isAdmin && (
+              <div
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  background: "linear-gradient(135deg, rgba(255, 215, 0, 0.4) 0%, transparent 50%, rgba(255, 193, 7, 0.4) 100%)",
+                  borderRadius: "50%",
+                  opacity: 0.6,
+                  pointerEvents: "none",
+                }}
+              />
+            )}
         </button>
             {showSettings && (
         <button
@@ -920,7 +1110,7 @@ const Header = ({
 /**
  * Shift Item Component
  */
-const Shift = ({ shift, onContextMenu, onDoubleClick }) => {
+const Shift = ({ shift, onContextMenu, onDoubleClick, topUserInitials }) => {
   const {
     site,
     startTime,
@@ -941,7 +1131,8 @@ const Shift = ({ shift, onContextMenu, onDoubleClick }) => {
     : isOps
     ? COLOR_OPS_BG
     : effectiveBgColor;
-  const displayFont = isComplete || isOps ? "#FFFFFF" : effectiveFontColor;
+  // Always use the effective font color, don't force white for complete/ops
+  const displayFont = effectiveFontColor;
 
   const defaultTextColor = site.startsWith("@") ? "#880808" : displayFont;
   const siteStyle = {
@@ -955,6 +1146,40 @@ const Shift = ({ shift, onContextMenu, onDoubleClick }) => {
     ? " shift-ops"
     : "";
 
+  // Check if time is "xxxx" (case-insensitive)
+  const isXxxx = (startTime && startTime.toUpperCase() === "XXXX") || 
+                 (endTime && endTime.toUpperCase() === "XXXX");
+  
+  // Determine font size - bigger if xxxx
+  const siteFontSize = isXxxx ? "1.35rem" : "1.35rem";
+  
+  // Determine what to display - hide time if xxxx
+  const displayText = isXxxx ? site : `${site} ${startTime}-${endTime}`;
+
+  // Check if shift is filled (non-white bgColor) and matches top 3 users
+  const isFilled = normalizedBg !== "#FFFFFF" && normalizedBg !== "FFFFFF" && 
+                   normalizedBg !== COLOR_COMPLETE_BG.toUpperCase() && 
+                   normalizedBg !== COLOR_OPS_BG.toUpperCase();
+  
+  // Determine which top user this is (1, 2, or 3)
+  let glowType = null;
+  if (topUserInitials && initials && isFilled) {
+    const userInitials = initials.trim().toUpperCase();
+    if (Array.isArray(topUserInitials)) {
+      const top1Index = topUserInitials.findIndex(t => t.initials === userInitials);
+      if (top1Index === 0) {
+        glowType = "titan"; // Top 1 - Titan purple
+      } else if (top1Index === 1) {
+        glowType = "gold"; // Top 2 - Gold
+      } else if (top1Index === 2) {
+        glowType = "silver"; // Top 3 - Silver
+      }
+    } else if (userInitials === topUserInitials.toUpperCase()) {
+      glowType = "titan"; // Legacy support for single top user
+    }
+  }
+  const shouldGlow = glowType !== null;
+
   return (
     <div
       onContextMenu={(e) => {
@@ -965,16 +1190,39 @@ const Shift = ({ shift, onContextMenu, onDoubleClick }) => {
       onDoubleClick={() => onDoubleClick(shift)}
       className={`shift-item p-2 rounded-md cursor-pointer select-none mb-2${shiftStatusClass}`}
       style={{
-        padding: "0.65rem",
+        padding: "0.10rem 0.45rem",
         borderRadius: "0.5rem",
         cursor: "pointer",
         userSelect: "none",
         marginBottom: "0.5rem",
         backgroundColor: displayBackground,
         color: displayFont,
-        border: "1px solid rgba(148, 163, 184, 0.25)",
-        ...(hasComments && { borderRight: "3px solid #FFA500" }),
-        boxShadow: "0 6px 16px rgba(2, 6, 23, 0.35)",
+        border: glowType === "titan" 
+          ? "2px solid rgba(139, 92, 246, 0.7)"
+          : glowType === "gold"
+          ? "2px solid rgba(255, 215, 0, 0.7)"
+          : glowType === "silver"
+          ? "2px solid rgba(192, 192, 192, 0.7)"
+          : "1px solid rgba(148, 163, 184, 0.25)",
+        ...(hasComments && { 
+          borderRight: "5px solid #FF8C00",
+          boxShadow: glowType === "titan"
+            ? "inset -2px 0 0 #000000, 0 0 8px rgba(139, 92, 246, 0.6), 0 0 16px rgba(124, 58, 237, 0.4), 0 6px 16px rgba(2, 6, 23, 0.35)"
+            : glowType === "gold"
+            ? "inset -2px 0 0 #000000, 0 0 8px rgba(255, 215, 0, 0.6), 0 0 16px rgba(255, 193, 7, 0.4), 0 6px 16px rgba(2, 6, 23, 0.35)"
+            : glowType === "silver"
+            ? "inset -2px 0 0 #000000, 0 0 8px rgba(192, 192, 192, 0.6), 0 0 16px rgba(169, 169, 169, 0.4), 0 6px 16px rgba(2, 6, 23, 0.35)"
+            : "inset -2px 0 0 #000000, 0 6px 16px rgba(2, 6, 23, 0.35)"
+        }),
+        ...(!hasComments && { 
+          boxShadow: glowType === "titan"
+            ? "0 0 8px rgba(139, 92, 246, 0.6), 0 0 16px rgba(124, 58, 237, 0.4), 0 6px 16px rgba(2, 6, 23, 0.35)"
+            : glowType === "gold"
+            ? "0 0 8px rgba(255, 215, 0, 0.6), 0 0 16px rgba(255, 193, 7, 0.4), 0 6px 16px rgba(2, 6, 23, 0.35)"
+            : glowType === "silver"
+            ? "0 0 8px rgba(192, 192, 192, 0.6), 0 0 16px rgba(169, 169, 169, 0.4), 0 6px 16px rgba(2, 6, 23, 0.35)"
+            : "0 6px 16px rgba(2, 6, 23, 0.35)"
+        }),
         transition: "transform 0.12s ease, box-shadow 0.12s ease",
       }}
     >
@@ -990,12 +1238,12 @@ const Shift = ({ shift, onContextMenu, onDoubleClick }) => {
           className="font-mono font-bold text-sm"
           style={{
             ...siteStyle,
-            fontSize: "0.82rem",
+            fontSize: siteFontSize,
             letterSpacing: "0.04em",
             fontWeight: 700,
           }}
         >
-          {site} {startTime}-{endTime}
+          {displayText}
         </span>
         <span
           className="font-mono font-bold text-sm ml-2 flex-shrink-0"
@@ -1004,7 +1252,7 @@ const Shift = ({ shift, onContextMenu, onDoubleClick }) => {
             marginLeft: "auto",
             fontWeight: 700,
             textTransform: "uppercase",
-            fontSize: "0.78rem",
+            fontSize: "0.92rem",
             }}
           >
             {initials}
@@ -1029,6 +1277,7 @@ const DayColumn = ({
   hasNotes,
   boardScrollRef,
   syncScrollRef,
+  topUserInitials,
 }) => {
   const sortedShifts = useMemo(() => {
     return [...shifts].sort((a, b) => {
@@ -1044,8 +1293,8 @@ const DayColumn = ({
       style={{
         display: "flex",
         flexDirection: "column",
-        flexBasis: "20%",
-        maxWidth: "20%",
+        flexBasis: "16.67%",
+        maxWidth: "16.67%",
         flexShrink: 0,
         height: "100%",
       }}
@@ -1067,7 +1316,7 @@ const DayColumn = ({
           style={{
             fontWeight: "bold",
             color: "#ffffff",
-            fontSize: "0.875rem",
+            fontSize: "0.98rem",
             textTransform: "uppercase",
           }}
         >
@@ -1114,6 +1363,7 @@ const DayColumn = ({
               shift={shift}
               onContextMenu={onContextMenu}
               onDoubleClick={onDoubleClick}
+              topUserInitials={topUserInitials}
             />
         ))}
       </div>
@@ -1252,7 +1502,7 @@ const ContextMenu = ({
       <ul
         style={{
           padding: "0.35rem 0",
-          fontSize: "0.92rem",
+          fontSize: "1.02rem",
           color: "#e2e8f0",
         }}
       >
@@ -1437,6 +1687,13 @@ const AddShiftModal = ({
     setIsFocused(false);
   };
 
+  const handleKeyDown = (e) => {
+    if (e.key === "Enter" && suggestions.length > 0) {
+      e.preventDefault();
+      selectSuggestion(suggestions[0]);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!site || !startTime || !endTime) {
@@ -1449,14 +1706,20 @@ const AddShiftModal = ({
     }
     setError("");
 
+    // Check if time is "xxxx" (case-insensitive) - set black bg and white font
+    const isXxxx = (startTime && startTime.toUpperCase() === "XXXX") || 
+                   (endTime && endTime.toUpperCase() === "XXXX");
+    const defaultBgColor = isXxxx ? "#000000" : "#FFFFFF";
+    const defaultFontColor = isXxxx ? "#FFFFFF" : "#000000";
+
     const newShift = {
       id: crypto.randomUUID(),
       site,
       startTime,
       endTime,
       initials: "",
-      bgColor: "#FFFFFF",
-      fontColor: "#000000",
+      bgColor: defaultBgColor,
+      fontColor: defaultFontColor,
       comments: [],
     };
 
@@ -1481,7 +1744,7 @@ const AddShiftModal = ({
         <div>
           <h3
             style={{
-              fontSize: "1.35rem",
+              fontSize: "1.5rem",
               fontWeight: 700,
               color: "#f8fafc",
               marginBottom: "0.35rem",
@@ -1491,7 +1754,7 @@ const AddShiftModal = ({
           </h3>
           <p
             style={{
-              fontSize: "0.9rem",
+              fontSize: "1.0rem",
               color: "#94a3b8",
               margin: 0,
             }}
@@ -1511,6 +1774,7 @@ const AddShiftModal = ({
               placeholder="Start typing…"
             value={site}
             onChange={handleSiteChange}
+            onKeyDown={handleKeyDown}
             onFocus={() => setIsFocused(true)}
               style={{
                 ...modalInputStyle,
@@ -1550,7 +1814,7 @@ const AddShiftModal = ({
                       background: "transparent",
                       border: "none",
                       color: "#e2e8f0",
-                      fontSize: "0.95rem",
+                      fontSize: "1.05rem",
                       cursor: "pointer",
                     }}
                     onMouseEnter={(e) => {
@@ -1605,7 +1869,7 @@ const AddShiftModal = ({
                 borderRadius: "0.75rem",
                 backgroundColor: "rgba(239, 68, 68, 0.15)",
                 color: "#fca5a5",
-                fontSize: "0.85rem",
+                fontSize: "0.95rem",
               }} 
             >
               {error}
@@ -1701,7 +1965,7 @@ const EditShiftModal = ({ shift, day, weekId, onClose, onUpdateShift }) => {
         <div>
           <h3
             style={{
-              fontSize: "1.35rem",
+              fontSize: "1.5rem",
               fontWeight: 700,
               color: "#f8fafc",
               marginBottom: "0.35rem",
@@ -1711,7 +1975,7 @@ const EditShiftModal = ({ shift, day, weekId, onClose, onUpdateShift }) => {
           </h3>
           <p
             style={{
-              fontSize: "0.9rem",
+              fontSize: "1.0rem",
               color: "#94a3b8",
               margin: 0,
             }}
@@ -1779,7 +2043,7 @@ const EditShiftModal = ({ shift, day, weekId, onClose, onUpdateShift }) => {
                 borderRadius: "0.75rem",
                 backgroundColor: "rgba(239, 68, 68, 0.15)",
                 color: "#fca5a5",
-                fontSize: "0.85rem",
+                fontSize: "0.95rem",
               }}
             >
               {error}
@@ -1834,8 +2098,20 @@ const EditShiftModal = ({ shift, day, weekId, onClose, onUpdateShift }) => {
  * Color Picker Modal
  */
 const ColorModal = ({ shift, day, onClose, onUpdateShift }) => {
+  // Always use the actual shift colors, even if it's marked as complete/ops
   const [fontColor, setFontColor] = useState(shift.fontColor || "#000000");
   const [bgColor, setBgColor] = useState(shift.bgColor || "#FFFFFF");
+
+  const handleBgColorChange = (newBgColor) => {
+    setBgColor(newBgColor);
+    // If changing to a non-Complete/Ops color and font is white, change to black
+    const normalizedNewBg = newBgColor.toUpperCase();
+    const isNewComplete = normalizedNewBg === COLOR_COMPLETE_BG.toUpperCase();
+    const isNewOps = normalizedNewBg === COLOR_OPS_BG.toUpperCase();
+    if (!isNewComplete && !isNewOps && (fontColor === COLOR_COMPLETE_FONT || fontColor === COLOR_OPS_FONT || fontColor === "#FFFFFF")) {
+      setFontColor("#000000");
+    }
+  };
 
   const handleSave = () => {
     const updatedShift = {
@@ -1887,7 +2163,7 @@ const ColorModal = ({ shift, day, onClose, onUpdateShift }) => {
         <div>
           <h3
             style={{
-              fontSize: "1.35rem",
+              fontSize: "1.5rem",
               fontWeight: 700,
               color: "#f8fafc",
               marginBottom: "0.35rem",
@@ -1897,7 +2173,7 @@ const ColorModal = ({ shift, day, onClose, onUpdateShift }) => {
           </h3>
           <p
             style={{
-              fontSize: "0.9rem",
+              fontSize: "1.0rem",
               color: "#94a3b8",
               margin: 0,
             }}
@@ -1917,7 +2193,7 @@ const ColorModal = ({ shift, day, onClose, onUpdateShift }) => {
           title="Fill Color"
           colors={FILL_COLORS}
           selected={bgColor}
-          onChange={setBgColor}
+          onChange={handleBgColorChange}
         />
         </div>
 
@@ -1933,7 +2209,7 @@ const ColorModal = ({ shift, day, onClose, onUpdateShift }) => {
             gap: "0.5rem",
           }}
         >
-          <span style={{ fontSize: "0.8rem", color: "#94a3b8", textTransform: "uppercase" }}>
+          <span style={{ fontSize: "0.9rem", color: "#94a3b8", textTransform: "uppercase" }}>
             Preview
           </span>
           <div
@@ -1951,7 +2227,7 @@ const ColorModal = ({ shift, day, onClose, onUpdateShift }) => {
               style={{
                 fontFamily: "monospace",
                 fontWeight: 700,
-                fontSize: "0.95rem",
+                fontSize: "1.05rem",
                 color: fontColor,
               }}
           >
@@ -1961,7 +2237,7 @@ const ColorModal = ({ shift, day, onClose, onUpdateShift }) => {
               style={{
                 fontFamily: "monospace",
                 fontWeight: 700,
-                fontSize: "0.95rem",
+                fontSize: "1.05rem",
                 color: fontColor,
               }}
             >
@@ -2089,7 +2365,7 @@ const CalendarModal = ({ currentDate, onClose, onDateSelect }) => {
           <div style={{ textAlign: "center" }}>
             <h4
               style={{
-                fontSize: "1.2rem",
+                fontSize: "1.35rem",
                 fontWeight: 600,
                 margin: 0,
               }}
@@ -2237,7 +2513,7 @@ const SignUpModal = ({ onClose, onSignUp }) => {
           </h3>
           <p
             style={{
-              fontSize: "0.9rem",
+              fontSize: "1.0rem",
               color: "#94a3b8",
               margin: 0,
             }}
@@ -2288,7 +2564,7 @@ const SignUpModal = ({ onClose, onSignUp }) => {
             <p
               style={{
                 marginTop: "0.35rem",
-                fontSize: "0.75rem",
+                fontSize: "0.85rem",
                 color: "#64748b",
               }}
             >
@@ -2303,7 +2579,7 @@ const SignUpModal = ({ onClose, onSignUp }) => {
                 borderRadius: "0.75rem",
                 backgroundColor: "rgba(239, 68, 68, 0.15)",
                 color: "#fca5a5",
-                fontSize: "0.85rem",
+                fontSize: "0.95rem",
               }}
             >
               {error}
@@ -2317,7 +2593,7 @@ const SignUpModal = ({ onClose, onSignUp }) => {
                 borderRadius: "0.75rem",
                 backgroundColor: "rgba(37, 99, 235, 0.12)",
                 color: "#bfdbfe",
-                fontSize: "0.85rem",
+                fontSize: "0.95rem",
               }}
             >
               {feedback}
@@ -2378,6 +2654,8 @@ const CommentModal = ({
   onUpdateShift,
   hasAccess,
   userInfo,
+  isAdmin,
+  registeredUsers,
 }) => {
   const [newComment, setNewComment] = useState("");
   const comments = useMemo(() => shift.comments || [], [shift.comments]);
@@ -2398,6 +2676,7 @@ const CommentModal = ({
       user: `${userInfo.firstName} ${userInfo.lastName} (${userInfo.initials})`,
       text: newComment,
       date: new Date().toISOString(),
+      isAdmin: isAdmin || false, // Store admin status with comment
     };
 
     const updatedShift = {
@@ -2415,7 +2694,7 @@ const CommentModal = ({
         <div>
           <h3
             style={{
-              fontSize: "1.35rem",
+              fontSize: "1.5rem",
               fontWeight: 700,
               color: "#f8fafc",
               marginBottom: "0.2rem",
@@ -2425,7 +2704,7 @@ const CommentModal = ({
       </h3>
           <p
             style={{
-              fontSize: "0.9rem",
+              fontSize: "1.0rem",
               color: "#94a3b8",
               margin: 0,
             }}
@@ -2454,7 +2733,7 @@ const CommentModal = ({
               style={{
                 textAlign: "center",
                 color: "rgba(148, 163, 184, 0.8)",
-                fontSize: "0.9rem",
+                fontSize: "1.0rem",
               }}
             >
               No comments yet.
@@ -2463,6 +2742,8 @@ const CommentModal = ({
           {comments.map((comment) => {
             const displayName = extractDisplayName(comment.user);
             const initials = extractInitials(comment.user);
+            // Simply check if the comment has isAdmin flag set to true
+            const isAdminUser = comment.isAdmin === true;
             return (
               <div
                 key={comment.id}
@@ -2482,17 +2763,41 @@ const CommentModal = ({
                     width: "2.6rem",
                     height: "2.6rem",
                     borderRadius: "9999px",
-                    background: "linear-gradient(135deg, #1f2937, #3b82f6)",
+                    background: isAdminUser 
+                      ? "linear-gradient(135deg, rgba(255, 215, 0, 0.3) 0%, rgba(255, 193, 7, 0.2) 50%, rgba(255, 215, 0, 0.3) 100%)"
+                      : "linear-gradient(135deg, #1f2937, #3b82f6)",
+                    border: isAdminUser ? "2px solid rgba(255, 215, 0, 0.6)" : "none",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
                     fontWeight: 700,
-                    fontSize: "0.95rem",
+                    fontSize: "1.05rem",
                     color: "#e2e8f0",
                     flexShrink: 0,
+                    position: "relative",
+                    overflow: "hidden",
+                    ...(isAdminUser && {
+                      boxShadow: "0 0 8px rgba(255, 215, 0, 0.5), inset 0 0 15px rgba(255, 215, 0, 0.15)",
+                      animation: "adminAvatarFade 4s ease-in-out infinite",
+                    }),
                   }}
                 >
                   {initials}
+                  {isAdminUser && (
+                    <div
+                      style={{
+                        position: "absolute",
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        background: "linear-gradient(135deg, rgba(255, 215, 0, 0.4) 0%, transparent 50%, rgba(255, 193, 7, 0.4) 100%)",
+                        borderRadius: "9999px",
+                        opacity: 0.6,
+                        pointerEvents: "none",
+                      }}
+                    />
+                  )}
                 </div>
                 <div
                   style={{
@@ -2510,7 +2815,84 @@ const CommentModal = ({
                       gap: "1rem",
                     }}
                   >
-                    <span style={{ fontWeight: 600, color: "#f1f5f9", fontSize: "0.95rem" }}>
+                    <span 
+                      style={{ 
+                        position: "relative",
+                        display: "inline-block",
+                        fontWeight: 600, 
+                        color: isAdminUser ? "#FFD700" : "#f1f5f9", 
+                        fontSize: "0.95rem",
+                        ...(isAdminUser && {
+                          background: "linear-gradient(90deg, #FFD700 0%, #FFF700 25%, #FFA500 50%, #FFF700 75%, #FFD700 100%)",
+                          backgroundSize: "200% 100%",
+                          WebkitBackgroundClip: "text",
+                          WebkitTextFillColor: "transparent",
+                          backgroundClip: "text",
+                          animation: "shimmer 3s linear infinite",
+                          filter: "drop-shadow(0 0 3px rgba(255, 215, 0, 0.8))",
+                        }),
+                      }}
+                    >
+                      {isAdminUser && (
+                        <>
+                          <span
+                            style={{
+                              position: "absolute",
+                              top: "-8px",
+                              left: "50%",
+                              transform: "translateX(-50%)",
+                              fontSize: "0.6rem",
+                              animation: "starRotate 4s linear infinite",
+                              animationDelay: "0s",
+                              pointerEvents: "none",
+                            }}
+                          >
+                            ✨
+                          </span>
+                          <span
+                            style={{
+                              position: "absolute",
+                              top: "50%",
+                              right: "-12px",
+                              transform: "translateY(-50%)",
+                              fontSize: "0.5rem",
+                              animation: "starRotate 4s linear infinite",
+                              animationDelay: "1s",
+                              pointerEvents: "none",
+                            }}
+                          >
+                            ⭐
+                          </span>
+                          <span
+                            style={{
+                              position: "absolute",
+                              bottom: "-8px",
+                              left: "50%",
+                              transform: "translateX(-50%)",
+                              fontSize: "0.6rem",
+                              animation: "starRotate 4s linear infinite",
+                              animationDelay: "2s",
+                              pointerEvents: "none",
+                            }}
+                          >
+                            ✨
+                          </span>
+                          <span
+                            style={{
+                              position: "absolute",
+                              top: "50%",
+                              left: "-12px",
+                              transform: "translateY(-50%)",
+                              fontSize: "0.5rem",
+                              animation: "starRotate 4s linear infinite",
+                              animationDelay: "3s",
+                              pointerEvents: "none",
+                            }}
+                          >
+                            ⭐
+                          </span>
+                        </>
+                      )}
                       {displayName}
                     </span>
                     <span style={{ fontSize: "0.75rem", color: "#94a3b8" }}>
@@ -2520,7 +2902,7 @@ const CommentModal = ({
                   <p
                     style={{
                       whiteSpace: "pre-wrap",
-                      fontSize: "0.95rem",
+                      fontSize: "1.05rem",
                       margin: 0,
                       color: "#cbd5f5",
                       lineHeight: 1.5,
@@ -2604,6 +2986,8 @@ const DayNotesModal = ({
   onUpdateDayNotes,
   hasAccess,
   userInfo,
+  isAdmin,
+  registeredUsers,
 }) => {
   const [newNote, setNewNote] = useState("");
   const dayNotes = useMemo(() => notes || [], [notes]);
@@ -2624,6 +3008,7 @@ const DayNotesModal = ({
       user: `${userInfo.firstName} ${userInfo.lastName} (${userInfo.initials})`,
       text: newNote,
       date: new Date().toISOString(),
+      isAdmin: isAdmin || false, // Store admin status with note
     };
 
     onUpdateDayNotes(day, [...dayNotes, note]);
@@ -2636,7 +3021,7 @@ const DayNotesModal = ({
         <div>
           <h3
             style={{
-              fontSize: "1.35rem",
+              fontSize: "1.5rem",
               fontWeight: 700,
               color: "#f8fafc",
               marginBottom: "0.2rem",
@@ -2646,7 +3031,7 @@ const DayNotesModal = ({
       </h3>
           <p
             style={{
-              fontSize: "0.9rem",
+              fontSize: "1.0rem",
               color: "#94a3b8",
               margin: 0,
             }}
@@ -2675,7 +3060,7 @@ const DayNotesModal = ({
               style={{
                 textAlign: "center",
                 color: "rgba(148, 163, 184, 0.85)",
-                fontSize: "0.9rem",
+                fontSize: "1.0rem",
               }}
             >
               No notes recorded yet.
@@ -2684,6 +3069,8 @@ const DayNotesModal = ({
           {dayNotes.map((note) => {
             const displayName = extractDisplayName(note.user);
             const initials = extractInitials(note.user);
+            // Simply check if the note has isAdmin flag set to true
+            const isAdminUser = note.isAdmin === true;
             return (
               <div
                 key={note.id}
@@ -2703,17 +3090,41 @@ const DayNotesModal = ({
                     width: "2.6rem",
                     height: "2.6rem",
                     borderRadius: "9999px",
-                    background: "linear-gradient(135deg, #1f2937, #22d3ee)",
+                    background: isAdminUser 
+                      ? "linear-gradient(135deg, rgba(255, 215, 0, 0.3) 0%, rgba(255, 193, 7, 0.2) 50%, rgba(255, 215, 0, 0.3) 100%)"
+                      : "linear-gradient(135deg, #1f2937, #22d3ee)",
+                    border: isAdminUser ? "2px solid rgba(255, 215, 0, 0.6)" : "none",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
                     fontWeight: 700,
-                    fontSize: "0.95rem",
+                    fontSize: "1.05rem",
                     color: "#e2e8f0",
                     flexShrink: 0,
+                    position: "relative",
+                    overflow: "hidden",
+                    ...(isAdminUser && {
+                      boxShadow: "0 0 8px rgba(255, 215, 0, 0.5), inset 0 0 15px rgba(255, 215, 0, 0.15)",
+                      animation: "adminAvatarFade 4s ease-in-out infinite",
+                    }),
                   }}
                 >
                   {initials}
+                  {isAdminUser && (
+                    <div
+                      style={{
+                        position: "absolute",
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        background: "linear-gradient(135deg, rgba(255, 215, 0, 0.4) 0%, transparent 50%, rgba(255, 193, 7, 0.4) 100%)",
+                        borderRadius: "9999px",
+                        opacity: 0.6,
+                        pointerEvents: "none",
+                      }}
+                    />
+                  )}
                 </div>
                 <div
                   style={{
@@ -2731,7 +3142,84 @@ const DayNotesModal = ({
                       gap: "1rem",
                     }}
                   >
-                    <span style={{ fontWeight: 600, color: "#f1f5f9", fontSize: "0.95rem" }}>
+                    <span 
+                      style={{ 
+                        position: "relative",
+                        display: "inline-block",
+                        fontWeight: 600, 
+                        color: isAdminUser ? "#FFD700" : "#f1f5f9", 
+                        fontSize: "0.95rem",
+                        ...(isAdminUser && {
+                          background: "linear-gradient(90deg, #FFD700 0%, #FFF700 25%, #FFA500 50%, #FFF700 75%, #FFD700 100%)",
+                          backgroundSize: "200% 100%",
+                          WebkitBackgroundClip: "text",
+                          WebkitTextFillColor: "transparent",
+                          backgroundClip: "text",
+                          animation: "shimmer 3s linear infinite",
+                          filter: "drop-shadow(0 0 3px rgba(255, 215, 0, 0.8))",
+                        }),
+                      }}
+                    >
+                      {isAdminUser && (
+                        <>
+                          <span
+                            style={{
+                              position: "absolute",
+                              top: "-8px",
+                              left: "50%",
+                              transform: "translateX(-50%)",
+                              fontSize: "0.6rem",
+                              animation: "starRotate 4s linear infinite",
+                              animationDelay: "0s",
+                              pointerEvents: "none",
+                            }}
+                          >
+                            ✨
+                          </span>
+                          <span
+                            style={{
+                              position: "absolute",
+                              top: "50%",
+                              right: "-12px",
+                              transform: "translateY(-50%)",
+                              fontSize: "0.5rem",
+                              animation: "starRotate 4s linear infinite",
+                              animationDelay: "1s",
+                              pointerEvents: "none",
+                            }}
+                          >
+                            ⭐
+                          </span>
+                          <span
+                            style={{
+                              position: "absolute",
+                              bottom: "-8px",
+                              left: "50%",
+                              transform: "translateX(-50%)",
+                              fontSize: "0.6rem",
+                              animation: "starRotate 4s linear infinite",
+                              animationDelay: "2s",
+                              pointerEvents: "none",
+                            }}
+                          >
+                            ✨
+                          </span>
+                          <span
+                            style={{
+                              position: "absolute",
+                              top: "50%",
+                              left: "-12px",
+                              transform: "translateY(-50%)",
+                              fontSize: "0.5rem",
+                              animation: "starRotate 4s linear infinite",
+                              animationDelay: "3s",
+                              pointerEvents: "none",
+                            }}
+                          >
+                            ⭐
+                          </span>
+                        </>
+                      )}
                       {displayName}
                     </span>
                     <span style={{ fontSize: "0.75rem", color: "#94a3b8" }}>
@@ -2741,7 +3229,7 @@ const DayNotesModal = ({
                   <p
                     style={{
                       whiteSpace: "pre-wrap",
-                      fontSize: "0.95rem",
+                      fontSize: "1.05rem",
                       margin: 0,
                       color: "#cbd5f5",
                       lineHeight: 1.5,
@@ -2833,7 +3321,7 @@ const RegisteredUsersModal = ({ users, onClose }) => {
         <div>
           <h3
             style={{
-              fontSize: "1.35rem",
+              fontSize: "1.5rem",
               fontWeight: 700,
               color: "#f8fafc",
               marginBottom: "0.25rem",
@@ -2843,7 +3331,7 @@ const RegisteredUsersModal = ({ users, onClose }) => {
           </h3>
           <p
             style={{
-              fontSize: "0.9rem",
+              fontSize: "1.0rem",
               color: "#94a3b8",
               margin: 0,
             }}
@@ -2884,7 +3372,7 @@ const RegisteredUsersModal = ({ users, onClose }) => {
               style={{
                 padding: "1.25rem",
                 textAlign: "center",
-                fontSize: "0.95rem",
+                fontSize: "1.05rem",
                 color: "rgba(148, 163, 184, 0.85)",
               }}
             >
@@ -2900,7 +3388,7 @@ const RegisteredUsersModal = ({ users, onClose }) => {
                   padding: "0.9rem 1rem",
                   borderBottom: "1px solid rgba(148, 163, 184, 0.12)",
                   color: "#e2e8f0",
-                  fontSize: "0.9rem",
+                  fontSize: "1.0rem",
                   alignItems: "center",
                   gap: "0.5rem",
                 }}
@@ -3011,7 +3499,26 @@ const App = () => {
   }); // State for paste menu
   const boardScrollRef = useRef(null); // Ref for board scroll container
   const syncScrollRef = useRef(false); // Prevent recursive scroll syncing
-  const [registeredUsers, setRegisteredUsers] = useState([]);
+  const [registeredUsers, setRegisteredUsers] = useState(() => {
+    // OPTIMIZED: Load from localStorage with cleanup and limits
+    try {
+      const saved = localStorage.getItem("scheduleRegisteredUsers");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        // Limit initial load to 500 entries to reduce memory usage
+        return Array.isArray(parsed) ? parsed.slice(0, 500) : [];
+      }
+      return [];
+    } catch (error) {
+      // If corrupted, clear it
+      try {
+        localStorage.removeItem("scheduleRegisteredUsers");
+      } catch (clearError) {
+        // Ignore clear errors
+      }
+      return [];
+    }
+  });
 
   const { user, userId, userInfo, hasAccess, initials, isAuthReady, signUp, clearUserInfo } =
     useUserAccess();
@@ -3047,35 +3554,177 @@ const App = () => {
     }
   }, []);
 
+  // OPTIMIZED: Limit localStorage usage and add cleanup
   useEffect(() => {
     if (!db) return;
 
     try {
+      // Only store essential data: initials and admin status (not full user objects)
+      const essentialData = registeredUsers.map(u => ({
+        userId: u.userId,
+        initials: u.initials,
+        isAdmin: u.isAdmin || false,
+      }));
+      
+      // Limit stored data to 1000 entries max
+      const limitedData = essentialData.slice(0, 1000);
+      
       localStorage.setItem(
         "scheduleRegisteredUsers",
-        JSON.stringify(registeredUsers)
+        JSON.stringify(limitedData)
       );
+      
+      // Cleanup: Remove old localStorage data if it exceeds 5MB
+      try {
+        const stored = localStorage.getItem("scheduleRegisteredUsers");
+        if (stored && new Blob([stored]).size > 5 * 1024 * 1024) {
+          // If stored data > 5MB, only keep last 500 entries
+          const parsed = JSON.parse(stored);
+          const cleaned = parsed.slice(-500);
+          localStorage.setItem("scheduleRegisteredUsers", JSON.stringify(cleaned));
+        }
+      } catch (cleanupError) {
+        console.warn("Error cleaning up localStorage:", cleanupError);
+      }
     } catch (error) {
       console.error("Unable to persist registered users:", error);
+      // If storage quota exceeded, clear old data
+      try {
+        localStorage.removeItem("scheduleRegisteredUsers");
+      } catch (clearError) {
+        console.error("Unable to clear localStorage:", clearError);
+      }
     }
   }, [registeredUsers]);
 
+  // Load registered users from Firestore with real-time listener
+  // OPTIMIZED: Only load users that are admins or recently active (last 90 days)
   useEffect(() => {
-    if (!userInfo || !userInfo.userId) return;
-    setRegisteredUsers((prev) => {
-      const existingIndex = prev.findIndex((u) => u.userId === userInfo.userId);
-      const enriched = {
-        ...userInfo,
-        createdAt: userInfo.createdAt || new Date().toISOString(),
-      };
-      if (existingIndex === -1) {
-        return [...prev, enriched];
+    if (!db || !isAuthReady || !userId) return;
+
+    let unsubscribe = null;
+
+    try {
+      // Split collection path into segments for Firestore
+      const collectionPath = REGISTERED_USERS_COLLECTION.split('/').filter(Boolean);
+      const usersCollectionRef = collection(db, ...collectionPath);
+      
+      // Use query with limit to prevent loading too many users
+      // Load all users for now (needed for admin detection), but limit to 1000 max
+      // In future, can optimize to only load admins + recent users
+      unsubscribe = onSnapshot(usersCollectionRef, (usersSnapshot) => {
+        const usersFromFirestore = [];
+        const ninetyDaysAgo = new Date();
+        ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+        
+        usersSnapshot.forEach((doc) => {
+          const userData = doc.data();
+          if (userData.initials && userData.initials.trim()) {
+            // Only include admin users or users created/active in last 90 days
+            const createdAt = userData.createdAt ? new Date(userData.createdAt) : null;
+            const isRecent = createdAt && createdAt >= ninetyDaysAgo;
+            const isAdmin = userData.isAdmin === true;
+            
+            // Always include admins, include recent users, limit total to prevent memory issues
+            if (isAdmin || isRecent || usersFromFirestore.length < 500) {
+              usersFromFirestore.push({
+                ...userData,
+                userId: doc.id,
+              });
+            }
+          }
+        });
+        
+        // Sort: admins first, then by creation date (newest first)
+        usersFromFirestore.sort((a, b) => {
+          if (a.isAdmin && !b.isAdmin) return -1;
+          if (!a.isAdmin && b.isAdmin) return 1;
+          const aDate = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+          const bDate = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+          return bDate - aDate;
+        });
+        
+        // Limit to top 500 users (all admins + most recent users)
+        const limitedUsers = usersFromFirestore.slice(0, 500);
+        
+        // Merge with local userInfo if it exists (always include current user)
+        if (userInfo && userInfo.userId) {
+          const existingIndex = limitedUsers.findIndex(
+            (u) => u.userId === userInfo.userId
+          );
+          const enriched = {
+            ...userInfo,
+            createdAt: userInfo.createdAt || new Date().toISOString(),
+          };
+          if (existingIndex === -1) {
+            // Current user not in list, add them (replace last if at limit)
+            if (limitedUsers.length >= 500) {
+              limitedUsers[499] = enriched;
+            } else {
+              limitedUsers.push(enriched);
+            }
+          } else {
+            limitedUsers[existingIndex] = {
+              ...limitedUsers[existingIndex],
+              ...enriched,
+            };
+          }
+        }
+        
+        setRegisteredUsers(limitedUsers);
+      }, (error) => {
+        console.error("Error loading registered users:", error);
+        // Fallback to local userInfo if Firestore fails
+        if (userInfo && userInfo.userId) {
+          setRegisteredUsers([{
+            ...userInfo,
+            createdAt: userInfo.createdAt || new Date().toISOString(),
+          }]);
+        }
+      });
+    } catch (error) {
+      console.error("Error setting up registered users listener:", error);
+      // Fallback to local userInfo if Firestore fails
+      if (userInfo && userInfo.userId) {
+        setRegisteredUsers([{
+          ...userInfo,
+          createdAt: userInfo.createdAt || new Date().toISOString(),
+        }]);
       }
-      const clone = [...prev];
-      clone[existingIndex] = { ...clone[existingIndex], ...enriched };
-      return clone;
-    });
-  }, [userInfo]);
+    }
+
+    return () => {
+      if (unsubscribe) {
+        unsubscribe();
+      }
+    };
+  }, [db, isAuthReady, userId, userInfo]);
+  
+  // Also sync current user to Firestore
+  useEffect(() => {
+    if (!db || !userInfo || !userInfo.userId) return;
+
+    const syncUserToFirestore = async () => {
+      try {
+        // Split collection path into segments for Firestore
+        const collectionPath = REGISTERED_USERS_COLLECTION.split('/').filter(Boolean);
+        const userDocRef = doc(db, ...collectionPath, userInfo.userId);
+        await setDoc(userDocRef, {
+          firstName: userInfo.firstName,
+          lastName: userInfo.lastName,
+          initials: userInfo.initials,
+          hasAccess: userInfo.hasAccess,
+          isAdmin: userInfo.isAdmin,
+          createdAt: userInfo.createdAt || new Date().toISOString(),
+          syncedWithFirebase: true,
+        }, { merge: true });
+      } catch (error) {
+        console.error("Error syncing user to Firestore:", error);
+      }
+    };
+
+    syncUserToFirestore();
+  }, [db, userInfo]);
 
   const weekId = useMemo(() => getWeekId(currentDate), [currentDate]);
   const weekDays = useMemo(() => {
@@ -3149,6 +3798,34 @@ const App = () => {
 
     return () => unsubscribe();
   }, [weekId, isAuthReady, userId, collectionPath, weekDays]); // Removed db and appId (outer scope constants)
+
+  // Calculate top 3 user initials from leaderboard
+  const topUserInitials = useMemo(() => {
+    const shiftCounts = {};
+    weekData.days?.forEach((day) => {
+      day.shifts?.forEach((shift) => {
+        if (shift.initials && shift.initials.trim()) {
+          const bgColor = shift.bgColor || "#FFFFFF";
+          const normalizedBg = bgColor.toUpperCase();
+          const isFilled = normalizedBg !== "#FFFFFF" && normalizedBg !== "FFFFFF" &&
+                          normalizedBg !== COLOR_COMPLETE_BG.toUpperCase() &&
+                          normalizedBg !== COLOR_OPS_BG.toUpperCase();
+          if (isFilled) {
+            const initials = shift.initials.trim().toUpperCase();
+            shiftCounts[initials] = (shiftCounts[initials] || 0) + 1;
+          }
+        }
+      });
+    });
+    const sorted = Object.entries(shiftCounts)
+      .map(([initials, count]) => ({ initials, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 3); // Top 3
+    return sorted.length > 0 ? sorted : null;
+  }, [weekData]);
+  
+  // Get isAdmin status
+  const isAdmin = Boolean(userInfo?.isAdmin);
 
   // --- Firestore Update Functions ---
 
@@ -3414,6 +4091,8 @@ const App = () => {
         onUpdateShift={handleUpdateShift}
         hasAccess={hasAccess}
         userInfo={userInfo}
+        isAdmin={isAdmin}
+        registeredUsers={registeredUsers}
       />
     );
   };
@@ -3435,6 +4114,8 @@ const App = () => {
         onUpdateDayNotes={handleUpdateDayNotes}
         hasAccess={hasAccess}
         userInfo={userInfo}
+        isAdmin={isAdmin}
+        registeredUsers={registeredUsers}
       />
     );
   };
@@ -3483,7 +4164,6 @@ const App = () => {
       handleUpdateShift(day, {
         ...shift,
         bgColor: COLOR_COMPLETE_BG, // Lighter green
-        fontColor: COLOR_COMPLETE_FONT, // White
         initials: shift.initials || initials,
       });
     }
@@ -3496,7 +4176,6 @@ const App = () => {
       handleUpdateShift(day, {
         ...shift,
         bgColor: COLOR_OPS_BG, // Lighter blue
-        fontColor: COLOR_OPS_FONT, // White
       });
     }
     setContextMenu({ visible: false });
@@ -3616,6 +4295,7 @@ const App = () => {
         showSettings={Boolean(userInfo?.isAdmin)}
         onOpenSettings={openRegisteredUsersModal}
         onLogout={handleLogout}
+        weekData={weekData}
       />
 
       {/* Schedule Board */}
@@ -3666,6 +4346,7 @@ const App = () => {
                     hasNotes={hasNotes}
                     boardScrollRef={boardScrollRef}
                     syncScrollRef={syncScrollRef}
+                    topUserInitials={topUserInitials}
                     onContextMenu={(e, shift) =>
                       handleContextMenu(e, day, shift)
                     }
