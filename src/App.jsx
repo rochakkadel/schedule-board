@@ -691,7 +691,7 @@ const Leaderboard = ({ weekData }) => {
             {getTrophyIcon(index) && (
               <span 
                 style={{ 
-                  fontSize: index === 0 ? "1.1rem" : "0.9rem",
+                  fontSize: index === 0 ? "1.2rem" : "1.0rem",
                   ...(index === 0 && {
                     filter: "drop-shadow(0 0 8px rgba(139, 92, 246, 1)) drop-shadow(0 0 16px rgba(124, 58, 237, 0.8)) drop-shadow(0 0 24px rgba(109, 40, 217, 0.6))",
                     animation: "titanShine 2.5s ease-in-out infinite",
@@ -711,7 +711,7 @@ const Leaderboard = ({ weekData }) => {
             )}
             <span
               style={{
-                fontSize: "0.8rem",
+                fontSize: "0.9rem",
                 fontWeight: 700,
                 color: getTrophyColor(index),
               }}
@@ -720,7 +720,7 @@ const Leaderboard = ({ weekData }) => {
             </span>
             <span
               style={{
-                fontSize: "0.7rem",
+                fontSize: "0.8rem",
                 color: getTrophyColor(index),
                 fontWeight: 600,
               }}
@@ -763,7 +763,7 @@ const Header = ({
     color: "#ffffff",
     borderRadius: "0.375rem",
     fontWeight: "bold",
-    fontSize: "1.05rem",
+    fontSize: "1.15rem",
     cursor: "pointer",
     transition: "background-color 0.15s ease",
   };
@@ -774,7 +774,7 @@ const Header = ({
     border: "1px solid rgba(148, 163, 184, 0.45)",
     backgroundColor: "rgba(15, 23, 42, 0.65)",
     color: "#e2e8f0",
-    fontSize: "0.92rem",
+    fontSize: "1.02rem",
     letterSpacing: "0.05em",
     textTransform: "uppercase",
     fontWeight: 600,
@@ -785,7 +785,7 @@ const Header = ({
   const legalButtonStyle = {
     ...linkButtonStyle,
     padding: "0.4rem 0.85rem",
-    fontSize: "0.85rem",
+    fontSize: "0.95rem",
     letterSpacing: "0.06em",
   };
 
@@ -840,7 +840,7 @@ const Header = ({
         }}
       >
         {renderNavButton("<", onPrevWeek)}
-        {renderNavButton("This Week", onToday, "0.98rem")}
+        {renderNavButton("This Week", onToday, "1.1rem")}
         {renderNavButton(">", onNextWeek)}
         {renderNavButton(<CalendarIcon />, onOpenCalendar)}
         <Leaderboard weekData={weekData} />
@@ -1190,11 +1190,11 @@ const Shift = ({ shift, onContextMenu, onDoubleClick, topUserInitials }) => {
       onDoubleClick={() => onDoubleClick(shift)}
       className={`shift-item p-2 rounded-md cursor-pointer select-none mb-2${shiftStatusClass}`}
       style={{
-        padding: "0.02rem 1.15rem",
+        padding: "0rem 1.15rem",
         borderRadius: "0.5rem",
         cursor: "pointer",
         userSelect: "none",
-        marginBottom: "0.3rem",
+        marginBottom: "0.15rem",
         backgroundColor: displayBackground,
         color: displayFont,
         border: glowType === "titan" 
@@ -4193,7 +4193,7 @@ const App = () => {
     const { shift } = contextMenu;
     if (shift) {
       setClipboard(shift); // Copy shift data to state
-      const details = `Site: ${shift.site}\nTime: ${shift.startTime}-${shift.endTime}\nInitials: ${shift.initials || ""}`;
+      const details = `${shift.site} ${shift.startTime}-${shift.endTime}`;
       if (navigator.clipboard?.writeText) {
         navigator.clipboard.writeText(details).catch((err) => {
           console.warn("Unable to write shift details to clipboard:", err);
