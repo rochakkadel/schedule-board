@@ -1,6 +1,5 @@
 # Schedule Board — Legal & Technical Overview
 
-_Last updated: November 2025_
 
 ## Overview
 
