@@ -1,134 +1,54 @@
 # Schedule Board — Legal & Technical Overview
 
-_Last updated: November 9, 2025_
+_Last updated: November 2025_
 
----
+## Overview
 
-## 1. Executive Summary
+Schedule Board is a web-based scheduling application built with React and Firebase. It enables teams to manage work shifts, assign staff to locations, and coordinate weekly schedules through an interactive calendar interface.
 
-Schedule Board is a web-based workforce planning and shift management tool built with React and Firebase. This document outlines the legal considerations, intellectual property (IP) stance, data-handling expectations, compliance posture, and the core technologies that power the application. It is intended for company leadership, legal counsel, security teams, partners, and other stakeholders who need an authoritative reference on the product’s rights and responsibilities.
+## Ownership
 
----
+All source code, design elements, and documentation are owned by Rochak Kadel. Third-party libraries and frameworks are used under their respective open-source licenses as specified in package.json.
 
-## 2. Ownership & Intellectual Property
+## Data Handling
 
-- **Copyright Ownership:** All original source code, user interface assets, copy, and documentation is owned by Rochak Kadel unless otherwise noted.
-- **Third-Party Assets:** Open-source libraries and frameworks are incorporated under their respective licenses (see §8). Any external artwork, fonts, or icons remain the property of their creators and are used according to applicable license terms.
-- **Trademark Usage:** “Schedule Board” and associated branding are trademarks owned by the project owner. Unauthorized use of branding elements is prohibited.
-- **Contributor IP:** Contributors grant the project a perpetual, worldwide, non-exclusive, royalty-free license to use submitted code, documentation, and assets.
+The application stores schedule data, user profiles, and comments in Firebase Firestore. User authentication uses Firebase's anonymous authentication by default, though custom authentication can be configured.
 
----
+Data is encrypted in transit and at rest by Firebase. User profiles are cached locally for offline functionality.
 
-## 3. Licensing Model
+Organizations deploying this application are responsible for:
+- Configuring Firebase security rules appropriately
+- Complying with applicable privacy regulations (GDPR, CCPA, HIPAA, etc.)
+- Providing privacy notices to end users
+- Implementing data retention and deletion policies
+- Establishing incident response procedures
 
-The application is currently distributed as a closed-source product for internal or client-specific deployment. Redistribution or public hosting requires explicit written authorization. If a different license (e.g., MIT, Apache-2.0) is adopted in the future, the license file in the repository root will supersede this section.
+## Features
 
----
+- Weekly calendar view for shift management
+- Color-coded shifts with time ranges and site assignments
+- Comments and notes for daily and shift-level communication
+- Access control via access codes
+- Real-time synchronization across users
+- Offline functionality with local storage
+- Leaderboard tracking shift assignments
 
-## 4. Regulatory & Compliance Considerations
+## Technology
 
-While Schedule Board does not inherently process regulated personal data, deployments may store personally identifiable information (PII) such as employee names or shift details. Operators must:
+- Frontend: React 18
+- Database: Firebase Firestore
+- Authentication: Firebase Auth
+- Build tool: Vite
+- Styling: Custom CSS with Tailwind
 
-1. Configure and secure Firebase projects in line with company or client compliance policies (GDPR, CCPA, HIPAA, etc.).
-2. Provide an accessible privacy notice to end users.
-3. Obtain user consent before collecting personal information in jurisdictions where required.
-4. Maintain an incident response plan covering data access, loss, or misuse.
+## Licensing
 
-This document does not constitute legal advice; consult qualified counsel to evaluate jurisdiction-specific obligations.
+This software is proprietary and closed-source. Redistribution, public hosting, or commercial use requires written authorization from the owner. Contact rochakrajkadel@gmail.com for licensing inquiries.
 
----
+## Support
 
-## 5. Privacy & Data Handling
+For questions or support requests, contact rochakrajkadel@gmail.com
 
-- **Data Storage:** User profiles, shift allocations, notes, and comments are stored in Firebase Firestore and synchronized to local storage for offline resilience.
-- **Authentication:** Anonymous Firebase authentication is used for lightweight access control; clients may substitute custom authentication providers if needed.
-- **Data Retention:** Operators control retention policies. It is recommended to implement periodic reviews and allow users to request profile deletion or anonymization.
-- **Access Controls:** Elevated privileges (e.g., editing shifts) require valid access codes or administrative designation.
-- **Encryption:** Firebase automatically encrypts data at rest and in transit. Additional application-layer encryption can be added if mandated.
+## Disclaimer
 
----
-
-## 6. Security Posture
-
-- **Transport Security:** All browser ↔ Firebase traffic uses HTTPS/TLS.
-- **Authentication Security:** Anonymous auth should be complemented with stricter auth if storing sensitive data. Rotate access codes regularly.
-- **Input Validation:** Client-side validation exists for most form fields. Back-end validation and rules (Firestore Security Rules) must be configured per deployment.
-- **Secrets Management:** Firebase credentials are provided via environment variables (e.g., `VITE_FIREBASE_*`). Do not hardcode production credentials in source control.
-- **Audit & Logging:** Enable Firebase logging features to monitor access, writes, and administrative actions.
-
----
-
-## 7. Feature Overview
-
-- **Schedule Grid:** Drag-and-drop style weekly calendar with shift creation, editing, and deletion workflows.
-- **User Access Modes:** View-only access by default; edit privileges unlocked with approved access codes 
-- **Shift Metadata:** Support for time ranges, site assignments, color-coding, comments, and status flags (complete, operations).
-- **Notes & Comments:** High-contrast modal interfaces for team collaboration on daily notes and per-shift comments.
-- **Contextual Menus:** Right-click menus enabling quick edits, duplication, color adjustments, and completion toggles.
-- **Animations & UX Enhancements:** Tailored transitions, hover states, and completion animations to reinforce workflow feedback.
-- **Offline Resilience:** Local storage caching ensures user profiles persist between sessions until sync is available.
-- **Registered Users Modal:** Real-time view of registered users when connected to a properly configured Firestore instance.
-
----
-
-## 8. Technology Stack
-
-| Layer | Technology | Notes |
-|---|---|---|
-| Front-end Framework | React 18 | SPA architecture, hooks-based state management |
-| Styling | CSS Modules / global CSS | Custom animations in `src/App.css`, Tailwind optional |
-| Icons & Assets | SVG assets | Stored in `src/assets/` |
-| State & Hooks | React hooks, custom `useUserAccess` | Local storage sync, Firebase auth |
-| Database | Firebase Firestore (modular SDK) | CRUD for schedule weeks, registered users |
-| Authentication | Firebase Auth (anonymous/custom) | Re-auth and local fallback logic included |
-| Tooling | Vite, ESLint | Modern build tooling, linting via `eslint.config.js` |
-
-Third-party dependencies are managed via `package.json`. Refer to the dependency tree and individual licenses before redistributing.
-
----
-
-## 9. Deployment & Operations
-
-coming soon
-
----
-
-## 10. Support & Maintenance
-
-coming soon
-
-
----
-
-## 11. Risk & Liability Disclaimers
-
-- Software is provided “as is” without warranty of any kind. Operators are responsible for configuring infrastructure securely.
-- The development team is not liable for data loss, downtime, or compliance violations stemming from misconfiguration or misuse.
-- Users must not rely solely on Schedule Board for critical life-or-death scheduling or safety-critical operations without redundancy.
-
----
-
-## 12. Change Management
-
-- **Document Updates:** Revision history will note material changes to legal, security, or feature descriptions.
-- **Breaking Changes:** A minimum 14-day notice is recommended before deploying breaking schema or API updates to production tenants.
-- **Third-Party Updates:** Monitor upstream library advisories for vulnerabilities (Firebase SDK, React, etc.) and patch promptly.
-
----
-
-## 13. Contact & Escalation
-
-- **General Inquiries:** rochakrajkadel@gmail.com
-
----
-
-## 14. Revision History
-
-| Date | Version | Author | Notes |
-|---|---|---|---|
-| 2025-11-09 | 1.0 | Rochak Kadel | Initial creation of legal, technical, and feature overview. |
-
----
-
-
-
+This software is provided "as is" without warranty. The developer is not liable for data loss, downtime, or compliance issues resulting from deployment or configuration. Organizations should not rely solely on this application for safety-critical scheduling without appropriate redundancy and backup systems.
