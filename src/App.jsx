@@ -1190,11 +1190,11 @@ const Shift = ({ shift, onContextMenu, onDoubleClick, topUserInitials }) => {
       onDoubleClick={() => onDoubleClick(shift)}
       className={`shift-item p-2 rounded-md cursor-pointer select-none mb-2${shiftStatusClass}`}
       style={{
-        padding: "0.10rem 0.45rem",
+        padding: "0.02rem 1.15rem",
         borderRadius: "0.5rem",
         cursor: "pointer",
         userSelect: "none",
-        marginBottom: "0.5rem",
+        marginBottom: "0.3rem",
         backgroundColor: displayBackground,
         color: displayFont,
         border: glowType === "titan" 
@@ -1293,8 +1293,8 @@ const DayColumn = ({
       style={{
         display: "flex",
         flexDirection: "column",
-        flexBasis: "16.67%",
-        maxWidth: "16.67%",
+        flexBasis: "22%",
+        maxWidth: "22%",
         flexShrink: 0,
         height: "100%",
       }}
