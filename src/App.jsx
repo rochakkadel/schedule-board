@@ -793,7 +793,7 @@ const Header = ({
   (() => {
     if (typeof window !== "undefined") {
       window.open(
-        "https://github.com/rochakkadel/schedule-board/blob/056f389fdf0c40ecbff80f6f3ccf099c74e304cd/LEGAL_AND_TECH_OVERVIEW.md",
+        "https://github.com/rochakkadel/schedule-board/blob/main/LEGAL_AND_TECH_OVERVIEW.md",
         "_blank",
         "noopener,noreferrer"
       );

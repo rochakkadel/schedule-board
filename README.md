@@ -1,261 +1,124 @@
 # Schedule Board
 
-High-performance workforce scheduling platform for teams that need live collaboration, granular access control, and audit-ready records. Built with React 19, Vite, and Firebase to deliver real-time updates, persistent storage, and zero-maintenance hosting.
+A web-based scheduling application for managing work shifts and team schedules. Built with React and Firebase.
 
----
+## Features
 
-## Contents
-- [Product Overview](#product-overview)
-- [Feature Matrix](#feature-matrix)
-- [System Architecture](#system-architecture)
-- [Local Development](#local-development)
-- [Configuration](#configuration)
-- [Usage Guide](#usage-guide)
-- [Deployment](#deployment)
-- [Operations & Maintenance](#operations--maintenance)
-- [Tech Stack](#tech-stack)
+- **Weekly Calendar View** - See and manage shifts for the entire week in one view
+- **Shift Management** - Create, edit, and delete shifts with time ranges and site assignments
+- **Color Coding** - Organize shifts with custom colors and preset statuses (Complete, OPS)
+- **Comments & Notes** - Add comments to individual shifts or notes for each day
+- **Access Control** - View-only by default, editing requires an access code
+- **Real-time Sync** - Changes sync instantly across all users
+- **Offline Support** - Works offline with local storage caching
+- **Leaderboard** - Track who's working the most shifts
+- **User Management** - View registered users and manage access levels
 
----
+## Technologies
 
-## Product Overview
-Schedule Board provides a single pane of glass for weekly operations. Supervisors can plan, adapt, and publish schedules in real time while collaborators consume the same data instantly—no page refresh, no version drift. Built-in analytics entry points, shift-level comments, and day notes keep institutional knowledge tied to the work surface.
+- **React 18** - Frontend framework
+- **Firebase Firestore** - Real-time database
+- **Firebase Auth** - User authentication
+- **Vite** - Build tool
+- **CSS/Tailwind** - Styling
 
-Target buyers include operations managers, staffing agencies, concierge teams, and distributed facilities groups that need:
-- Controlled access (viewer vs. editor vs. admin)
-- Fine-grained shift editing with contextual metadata
-- Always-on web delivery without installing native software
-- GitHub Pages + Firebase hosting for low-cost, global reach
-
----
-
-## Feature Matrix
-
-**Scheduling Core**
-- Weekly horizontal board with seven sticky columns and synchronized vertical scrolling
-- Shift cards with site, time window, initials, and customizable colors
-- Keyboard-friendly add/edit/delete flows with validation
-- Bulk copy via context menu and quick paste targets
-
-**Collaboration**
-- Shift-level comment threads with timestamped audit trail
-- Day-level notes panel for handoff narratives
-- Real-time Firestore subscriptions for live multi-user updates
-
-**Access Control**
-- Anonymous Firebase Auth bootstrap with configurable onboarding flow
-- Tiered permissions (viewer, editor, admin) driven by Firestore user records
-- Persistent auth state for immediate reloads and kiosk deployment
-
-**Insights & Integrations**
-- Deep links to Analysis dashboard (`ANALYSIS_URL`)
-- Site Manager launch shortcut for inventory or staffing satellite apps
-- Export-ready data structure (Firestore `artifacts/{appId}/public/data/schedule-weeks`)
-
-**UX Enhancements**
-- Sticky headers, hidden scrollbars, and smooth transitions
-- Context menus for actions (`Complete`, `OPS`, `Change Colors`, `Comment`, `Copy Shift`, `Delete`)
-- Tailwind-inspired custom styling with high-contrast dark theme
-- Responsive layout optimized for desktop ops centers (works on tablets down to 1024px)
-
----
-
-## System Architecture
-
-```
-┌──────────────────────────────────────────────────────────┐
-│                    Client (React 19)                     │
-│                                                          │
-│  - Vite dev server / build pipeline                      │
-│  - Contextual modals and menus (Shift, Notes, Users)     │
-│  - State via hooks, refs, and memoized selectors         │
-│  - Local caching: `localStorage` for user info & users   │
-└───────────────┬──────────────────────────────────────────┘
-                │ Real-time sync (Firebase SDK)
-┌───────────────▼──────────────────────────────────────────┐
-│                    Firebase Backend                      │
-│                                                          │
-│  Authentication        Firestore                         │
-│  - Anonymous bootstrap  - Schedule weeks collection      │
-│  - Custom token hook    - Day objects (shifts + notes)   │
-│  - Auth code gating     - Registered users roster        │
-│                                                          │
-│                         Security                         │
-│  - Rules enforce read/write by anonymous UID             │
-│  - Access tier encoded per user document                 │
-└──────────────────────────────────────────────────────────┘
-
-Continuous delivery handled via GitHub Actions → GitHub Pages for the React bundle, while Firebase serves as the realtime data layer.
-
----
-
-## Local Development
+## Getting Started
 
 ### Prerequisites
-- Node.js ≥ 20
-- npm (bundled with Node) or yarn
-- Firebase project with Firestore + Authentication enabled
-- GitHub account (for CI/CD integration)
+
+- Node.js 20 or higher
+- npm or yarn
+- Firebase project with Firestore and Authentication enabled
 
 ### Installation
+
+1. Clone the repository:
 ```bash
-git clone https://github.com/<your-org>/schedule-board.git
+git clone https://github.com/rochakkadel/schedule-board.git
 cd schedule-board
+```
+
+2. Install dependencies:
+```bash
 npm install
 ```
 
-### Environment Bootstrap
-Create `.env.local` in the repository root. Minimum keys:
+3. Create a `.env.local` file in the root directory with your Firebase credentials:
 ```env
-VITE_FIREBASE_API_KEY=...
-VITE_FIREBASE_AUTH_DOMAIN=...
-VITE_FIREBASE_PROJECT_ID=...
-VITE_FIREBASE_STORAGE_BUCKET=...
-VITE_FIREBASE_MESSAGING_SENDER_ID=...
-VITE_FIREBASE_APP_ID=...
-VITE_FIREBASE_MEASUREMENT_ID=...
+VITE_FIREBASE_API_KEY=your_api_key
+VITE_FIREBASE_AUTH_DOMAIN=your_auth_domain
+VITE_FIREBASE_PROJECT_ID=your_project_id
+VITE_FIREBASE_STORAGE_BUCKET=your_storage_bucket
+VITE_FIREBASE_MESSAGING_SENDER_ID=your_messaging_sender_id
+VITE_FIREBASE_APP_ID=your_app_id
+VITE_FIREBASE_MEASUREMENT_ID=your_measurement_id
 ```
 
-Optional overrides (set only if you are extending the platform):
-- `VITE_FIREBASE_EMULATOR_HOST`
-- `VITE_ANALYSIS_URL`
-- `VITE_SITE_MANAGER_URL`
-
-### Run Dev Server (for contributors)
+4. Run the development server:
 ```bash
 npm run dev
 ```
-Open the printed URL (defaults to `http://localhost:5173`). Hot Module Replacement is enabled via Vite.
 
----
+5. Open your browser to `http://localhost:5173`
 
-## Configuration
+## How to Use
 
-### Firebase Setup Checklist
-1. Create a new Firebase project.
-2. Enable **Authentication → Sign-in Method → Anonymous**.
-3. Enable **Firestore** in production mode. Create the following collections:
-   - `artifacts/{appId}/public/data/schedule-weeks`
-   - `artifacts/{appId}/public/data/registered-users`
-   - `artifacts/{appId}/public/data/site-directory` (optional for site lookup)
-4. Add web app credentials and paste them into `.env.local`.
-5. Configure security rules (sample):
-   ```javascript
-   rules_version = '2';
-   service cloud.firestore {
-     match /databases/{database}/documents {
-       match /artifacts/{appId}/public/data/{document=**} {
-         allow read, write: if request.auth != null;
-       }
-     }
-   }
-   ```
-   Adjust per your trust boundaries (e.g., role-specific claims).
+### First Time Setup
 
----
+1. Click the **LOGIN** button in the header
+2. Enter your first name, last name, and access code (if provided by your administrator)
+3. Your profile will be saved for future sessions
 
-## Usage Guide
+### Navigating the Schedule
 
-### Sign-Up & Roles
-1. On first load, anonymous auth provisions a UID.
-2. Click `LOGIN` to open the sign-up modal.
-3. Provide first/last name and (if supplied by your administrator) an access credential to unlock editor or admin capabilities.
+- Use the **<** and **>** buttons to move between weeks
+- Click **This Week** to jump to the current week
+- Click the calendar icon to pick a specific date
+- Scroll horizontally to see all days of the week
 
-User profile persists in browser storage and Firestore for reuse across sessions—ideal for kiosks or shared terminals.
+### Creating Shifts
 
-### Navigating the Week
-- `<` / `>` buttons jump weeks.
-- `ts week` returns to the week containing today.
-- Calendar icon opens a month picker for random access.
-- Horizontal scrolling supports touchpads (scroll wheel converts to horizontal drag).
+1. Click the **+** button at the bottom of any day column
+2. Enter the site name (autocomplete suggestions will appear)
+3. Enter start time and end time in 24-hour format (e.g., 0700, 1500)
+4. Click **Add Shift**
 
-### Managing Shifts
-- `+` button at bottom of each day opens the Add Shift modal (editor+).
-- Right-click shift exposes context menu:
-  - `✅ Complete` / `⚙️ OPS` toggles color presets.
-  - `Change Colors` opens palette modal for custom font/background.
-  - `Copy Shift` duplicates metadata into clipboard (with system copy fallback).
-  - `Delete Shift` removes entry (requires confirmation via context menu).
-  - `Comment` (or double-click) opens threaded discussion for the shift.
+### Editing Shifts
 
-### Notes & Collaboration
-- Day footer includes `📄` note button. Editors can append notes; viewers read history.
-- Each comment/note tracks author, initials, and ISO timestamp via `formatTimestamp`.
+- **Right-click** any shift to open the context menu:
+  - **Complete** - Mark shift as complete (green)
+  - **OPS** - Mark as operations shift (blue)
+  - **Change Colors** - Customize background and text colors
+  - **Comment** - Add comments to the shift
+  - **Copy Shift** - Copy shift details to clipboard
+  - **Edit Shift** - Modify shift details
+  - **Delete Shift** - Remove the shift
 
-### Admin Utilities
-- Logged-in admins see a gear icon next to their avatar.
-- Clicking gear opens **Registered Users** modal with sortable roster (name, initials, role, created date).
-- `Analysis` and `Site Manager` quick links launch external dashboards in new tabs.
+- **Double-click** a shift to add or view comments
 
-### Data Model
-Each Firestore week document:
-```json
-{
-  "days": [
-    {
-      "date": "2025-02-09",
-      "shifts": [
-        {
-          "id": "uuid",
-          "site": "500 Howard St",
-          "startTime": "0700",
-          "endTime": "1500",
-          "initials": "RK",
-          "bgColor": "#FFFFFF",
-          "fontColor": "#000000",
-          "comments": [{ "id": "...", "user": "...", "text": "...", "date": "..." }]
-        }
-      ],
-      "notes": [{ "id": "...", "user": "...", "text": "...", "date": "..." }]
-    }
-  ]
-}
-```
-This shape maps cleanly to BI tools or payroll exports.
+### Adding Notes
 
----
+1. Click the **📄** note button at the bottom of any day column
+2. Type your note in the modal
+3. Notes are visible to all users and include timestamps
 
-## Deployment
+### Viewing Users
 
-Automated via GitHub Actions → GitHub Pages. See [`DEPLOYMENT.md`](./DEPLOYMENT.md) for pipeline specifics.
+- Admins can click the gear icon next to their avatar
+- This opens a modal showing all registered users with their roles and access levels
 
-**Quick start:**
-1. Fork or mirror the repository.
-2. In GitHub repository settings:
-   - Configure `GitHub Pages` to use `GitHub Actions`.
-   - Populate repository secrets:
-     - `VITE_FIREBASE_*` variables (same as `.env.local`).
-3. Push to `main`. The included workflow builds with `npm run build` and publishes `/dist` to Pages.
+## Building for Production
 
-**Manual Build**
 ```bash
-npm run build   # Generates production bundle under dist/
+npm run build
 ```
-You can host the `dist` folder on any static hosting service (Netlify, Vercel, S3 + CloudFront, etc.). Ensure environment variables are injected at build time.
 
----
+This creates a production-ready build in the `dist` folder that can be deployed to any static hosting service.
 
-## Operations & Maintenance
+## License
 
-- **Backups**: Firestore retains point-in-time recovery. Export weekly snapshots via Firebase scheduled exports if compliance requires.
-- **Monitoring**: Enable Cloud Logging and Firestore usage dashboards to watch read/write quotas.
-- **Scaling**: App is serverless; main scaling vector is Firestore document size (keep day payloads under 1 MiB by trimming notes/comments over time).
-- **Customization**: Tailor constants in `src/App.jsx` (`DEFAULT_SITE_NAMES`, color palettes, URL endpoints) to match your brand or vertical.
-- **Security Hardening**:
-- **Customization**: Tailor constants in `src/App.jsx` (site directory, color palettes, destination URLs) to match your brand or vertical.
-- **Security Hardening**:
-  - Drive role assignment via Firestore or Firebase Custom Claims.
-  - Restrict GitHub Pages domain with custom domain + HTTPS required.
+This software is proprietary and closed-source. For licensing inquiries, contact rochakrajkadel@gmail.com
 
----
+## Support
 
-## Tech Stack
-
-- **Framework**: React 19 (function components + hooks)
-- **Build Tooling**: Vite 5, ESBuild, PostCSS
-- **UI Layer**: Tailwind CSS principles with handcrafted styles (no runtime dependency)
-- **State/Data**: Firebase Firestore (real-time streaming) + Auth SDK
-- **Tooling**: ESLint (flat config), GitHub Actions CI/CD, npm scripts
-
----
-
-Ready to white-label, bundle with managed hosting, or upsell as a SaaS-ready scheduling portal. For enterprise pilots, pair with Firebase multi-tenant projects and extend the analytics integration endpoints. Let us know if you need architecture diagrams, SOC 2 starter policies, or sales battlecards.
+For questions or issues, email rochakrajkadel@gmail.com
