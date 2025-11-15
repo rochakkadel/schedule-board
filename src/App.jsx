@@ -1495,6 +1495,66 @@ const ContextMenu = ({
   onSplit, // New prop for split shift
 }) => {
   const menuRef = useClickOutside(onClose);
+  const [adjustedPosition, setAdjustedPosition] = useState({ x: menuState.x, y: menuState.y });
+
+  useEffect(() => {
+    // Reset position when menu becomes visible or position changes
+    if (menuState.visible) {
+      setAdjustedPosition({ x: menuState.x, y: menuState.y });
+    }
+  }, [menuState.visible, menuState.x, menuState.y]);
+
+  useEffect(() => {
+    if (!menuState.visible || !menuRef.current) return;
+    
+    // Adjust position after menu is rendered
+    const adjustPosition = () => {
+      if (!menuRef.current) return;
+      
+      const menu = menuRef.current;
+      const rect = menu.getBoundingClientRect();
+      const windowWidth = window.innerWidth;
+      const windowHeight = window.innerHeight;
+      
+      setAdjustedPosition(prev => {
+        let newX = prev.x;
+        let newY = prev.y;
+        
+        // Adjust horizontal position if menu goes off right edge
+        if (rect.right > windowWidth) {
+          newX = windowWidth - rect.width - 10; // 10px padding from edge
+        }
+        
+        // Adjust horizontal position if menu goes off left edge
+        if (rect.left < 0 || newX < 10) {
+          newX = Math.max(10, windowWidth - rect.width - 10);
+        }
+        
+        // Adjust vertical position if menu goes off bottom edge
+        if (rect.bottom > windowHeight) {
+          newY = windowHeight - rect.height - 10; // 10px padding from edge
+        }
+        
+        // Adjust vertical position if menu goes off top edge
+        if (rect.top < 0 || newY < 10) {
+          newY = Math.max(10, windowHeight - rect.height - 10);
+        }
+        
+        // Only update if position changed to avoid unnecessary re-renders
+        if (prev.x === newX && prev.y === newY) {
+          return prev;
+        }
+        return { x: newX, y: newY };
+      });
+    };
+    
+    // Use requestAnimationFrame to ensure rendering is complete
+    const rafId = requestAnimationFrame(() => {
+      requestAnimationFrame(adjustPosition);
+    });
+    
+    return () => cancelAnimationFrame(rafId);
+  }, [menuState.visible, menuState.x, menuState.y, menuRef]);
 
   if (!menuState.visible) return null;
 
@@ -1526,8 +1586,8 @@ const ContextMenu = ({
       ref={menuRef}
       className="context-menu fixed z-50"
       style={{
-        top: menuState.y,
-        left: menuState.x,
+        top: adjustedPosition.y,
+        left: adjustedPosition.x,
         position: "fixed",
         zIndex: 50,
         minWidth: "13rem",
