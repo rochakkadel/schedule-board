@@ -2,6 +2,7 @@
 
 
 ## Overview
+https://docs.google.com/presentation/d/1BQYZQ5q0LiMVXRk7F2jnYz2RRaB7fTDtIP2kz8_1MkU/edit?usp=sharing
 
 Schedule Board is a web-based scheduling application built with React and Firebase.
 
