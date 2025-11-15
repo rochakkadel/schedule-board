@@ -3,7 +3,7 @@
 
 ## Overview
 
-Schedule Board is a web-based scheduling application built with React and Firebase. It enables teams to manage work shifts, assign staff to locations, and coordinate weekly schedules through an interactive calendar interface.
+Schedule Board is a web-based scheduling application built with React and Firebase.
 
 ## Ownership
 
