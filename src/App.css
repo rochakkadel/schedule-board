@@ -31,15 +31,9 @@
 @keyframes shift-entry {
   0% {
     opacity: 0;
-    transform: translateY(8px) scale(0.95);
-  }
-  60% {
-    opacity: 1;
-    transform: translateY(-2px) scale(1.02);
   }
   100% {
     opacity: 1;
-    transform: translateY(0) scale(1);
   }
 }
 
@@ -129,16 +123,13 @@
 .shift-item {
   position: relative;
   overflow: hidden;
-  animation: shift-entry 1.4s var(--micro-ease);
-  transition: transform 3.18s var(--micro-ease), box-shadow 3.2s var(--micro-ease),
-    background-color 3.25s ease, border-color 3.25s ease, filter 1.25s ease;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
   transform-origin: center;
 }
 
 .shift-item:hover {
-  transform: translateY(-4px) scale(1.015);
-  box-shadow: 0 16px 30px rgba(2, 6, 23, 0.45);
-  filter: brightness(1.03);
+  transform: translateY(-3px) scale(1.02);
+  box-shadow: 0 12px 24px rgba(2, 6, 23, 0.4);
 }
 
 .shift-item:active {
@@ -146,7 +137,7 @@
 }
 
 .shift-item.shift-complete {
-  animation: status-pop 0.45s var(--micro-ease);
+  /* No initial animation */
 }
 
 .shift-item.shift-complete::before {
@@ -169,7 +160,7 @@
         transparent 12px
       );
   opacity: 0;
-  animation: shift-grid-surge 1.1s cubic-bezier(0.2, 0.8, 0.3, 1) forwards;
+  /* No animation on initial load */
   pointer-events: none;
   mix-blend-mode: screen;
 }
@@ -186,16 +177,16 @@
     rgba(22, 163, 74, 0.9) 100%
   );
   transform-origin: left center;
-  transform: scaleX(0);
-  opacity: 0.75;
-  animation: shift-battery-fill 0.95s cubic-bezier(0.18, 0.82, 0.26, 1) forwards 0.08s;
+  transform: scaleX(1);
+  opacity: 0;
+  /* No animation on initial load */
   border-radius: inherit;
   pointer-events: none;
   mix-blend-mode: screen;
 }
 
 .shift-item.shift-ops {
-  animation: status-ops 0.45s var(--micro-ease);
+  /* No initial animation */
 }
 
 .day-column-content {
@@ -241,7 +232,7 @@
 }
 
 .plus-button {
-  animation: shift-entry 0.4s var(--micro-ease);
+  /* No initial animation */
 }
 
 .plus-button:hover {

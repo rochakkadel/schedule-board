@@ -1232,6 +1232,9 @@ const Shift = ({ shift, onContextMenu, onDoubleClick, topUserInitials }) => {
           justifyContent: "space-between",
           alignItems: "center",
           gap: "0.75rem",
+          lineHeight: isOps ? "1.0" : "1.5",
+          transform: isOps ? "scaleY(0.9)" : "none",
+          transformOrigin: "center",
         }}
       >
         <span
@@ -1241,6 +1244,7 @@ const Shift = ({ shift, onContextMenu, onDoubleClick, topUserInitials }) => {
             fontSize: siteFontSize,
             letterSpacing: "0.04em",
             fontWeight: 700,
+            lineHeight: isOps ? "1.0" : "inherit",
           }}
         >
           {displayText}
@@ -1253,6 +1257,7 @@ const Shift = ({ shift, onContextMenu, onDoubleClick, topUserInitials }) => {
             fontWeight: 700,
             textTransform: "uppercase",
             fontSize: "0.92rem",
+            lineHeight: isOps ? "1.0" : "inherit",
             }}
           >
             {initials}
@@ -2895,9 +2900,43 @@ const CommentModal = ({
                       )}
                       {displayName}
                     </span>
-                    <span style={{ fontSize: "0.75rem", color: "#94a3b8" }}>
-                      {formatTimestamp(comment.date)}
-                    </span>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                      <span style={{ fontSize: "0.75rem", color: "#94a3b8" }}>
+                        {formatTimestamp(comment.date)}
+                      </span>
+                      {hasAccess && (
+                        <button
+                          onClick={() => {
+                            const updatedComments = comments.filter(c => c.id !== comment.id);
+                            const updatedShift = {
+                              ...shift,
+                              comments: updatedComments,
+                            };
+                            onUpdateShift(day, updatedShift);
+                          }}
+                          style={{
+                            padding: "0.25rem 0.5rem",
+                            fontSize: "0.75rem",
+                            color: "#fca5a5",
+                            backgroundColor: "rgba(239, 68, 68, 0.1)",
+                            border: "1px solid rgba(239, 68, 68, 0.3)",
+                            borderRadius: "0.375rem",
+                            cursor: "pointer",
+                            transition: "all 0.15s ease",
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = "rgba(239, 68, 68, 0.2)";
+                            e.currentTarget.style.borderColor = "rgba(239, 68, 68, 0.5)";
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = "rgba(239, 68, 68, 0.1)";
+                            e.currentTarget.style.borderColor = "rgba(239, 68, 68, 0.3)";
+                          }}
+                        >
+                          Delete
+                        </button>
+                      )}
+                    </div>
                   </div>
                   <p
                     style={{
@@ -3222,9 +3261,39 @@ const DayNotesModal = ({
                       )}
                       {displayName}
                     </span>
-                    <span style={{ fontSize: "0.75rem", color: "#94a3b8" }}>
-                      {formatTimestamp(note.date)}
-                    </span>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                      <span style={{ fontSize: "0.75rem", color: "#94a3b8" }}>
+                        {formatTimestamp(note.date)}
+                      </span>
+                      {hasAccess && (
+                        <button
+                          onClick={() => {
+                            const updatedNotes = dayNotes.filter(n => n.id !== note.id);
+                            onUpdateDayNotes(day, updatedNotes);
+                          }}
+                          style={{
+                            padding: "0.25rem 0.5rem",
+                            fontSize: "0.75rem",
+                            color: "#fca5a5",
+                            backgroundColor: "rgba(239, 68, 68, 0.1)",
+                            border: "1px solid rgba(239, 68, 68, 0.3)",
+                            borderRadius: "0.375rem",
+                            cursor: "pointer",
+                            transition: "all 0.15s ease",
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = "rgba(239, 68, 68, 0.2)";
+                            e.currentTarget.style.borderColor = "rgba(239, 68, 68, 0.5)";
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = "rgba(239, 68, 68, 0.1)";
+                            e.currentTarget.style.borderColor = "rgba(239, 68, 68, 0.3)";
+                          }}
+                        >
+                          Delete
+                        </button>
+                      )}
+                    </div>
                   </div>
                   <p
                     style={{
@@ -3499,6 +3568,9 @@ const App = () => {
   }); // State for paste menu
   const boardScrollRef = useRef(null); // Ref for board scroll container
   const syncScrollRef = useRef(false); // Prevent recursive scroll syncing
+  // Cache for week documents to reduce Firebase reads
+  const weekCacheRef = useRef(new Map());
+  
   const [registeredUsers, setRegisteredUsers] = useState(() => {
     // OPTIMIZED: Load from localStorage with cleanup and limits
     try {
@@ -3831,11 +3903,23 @@ const App = () => {
 
   /**
    * Helper to get the current state of the week document
+   * OPTIMIZED: Uses cached data from weekData state when available
    */
   const getWeekDoc = async () => {
     if (!db) return [];
-    const weekDocRef = doc(db, collectionPath, weekId); // Modular syntax
-    const docSnap = await getDoc(weekDocRef); // Modular syntax
+    
+    // Use cached weekData if available and matches current week
+    if (weekData.days && weekData.days.length > 0) {
+      return weekData.days.map((day) => ({
+        date: day.dateString || getDateKey(day.date),
+        shifts: day.shifts || [],
+        notes: day.notes || [],
+      }));
+    }
+    
+    // Fallback to fetching from Firebase
+    const weekDocRef = doc(db, collectionPath, weekId);
+    const docSnap = await getDoc(weekDocRef);
     if (docSnap.exists()) {
       const savedDays = Array.isArray(docSnap.data().days)
         ? docSnap.data().days
@@ -3853,14 +3937,14 @@ const App = () => {
     return weekDays.map((day) => ({
       date: day.dateString,
       shifts: [],
-      notes: [], // Add notes
+      notes: [],
     }));
   };
 
   /**
    * Updates a single shift in the database.
    */
-  const handleUpdateShift = async (day, updatedShift) => {
+  const handleUpdateShift = useCallback(async (day, updatedShift) => {
     if (!db) {
       console.error("Cannot update shift, DB not connected.");
       return;
@@ -3884,12 +3968,12 @@ const App = () => {
     const weekDocRef = doc(db, collectionPath, weekId); // Modular syntax
     await setDoc(weekDocRef, { days: currentDays }, { merge: true }); // Modular syntax
     closeModal();
-  };
+  }, [db, weekId, collectionPath, weekData, weekDays]);
 
   /**
    * Deletes a shift from the database.
    */
-  const handleDeleteShift = async (day, shiftToDelete) => {
+  const handleDeleteShift = useCallback(async (day, shiftToDelete) => {
     if (!db) {
       console.error("Cannot delete shift, DB not connected.");
       return;
@@ -3907,12 +3991,12 @@ const App = () => {
     const weekDocRef = doc(db, collectionPath, weekId); // Modular syntax
     await setDoc(weekDocRef, { days: currentDays }, { merge: true }); // Modular syntax
     closeModal();
-  };
+  }, [db, weekId, collectionPath, weekData, weekDays]);
 
   /**
    * Pastes a shift into a day.
    */
-  const handlePasteShift = async () => {
+  const handlePasteShift = useCallback(async () => {
     const { day } = pasteMenuState;
     if (!db || !day || !clipboard) {
       console.error("Cannot paste shift, DB, day, or clipboard missing.");
@@ -3937,12 +4021,12 @@ const App = () => {
     const weekDocRef = doc(db, collectionPath, weekId); // Modular syntax
     await setDoc(weekDocRef, { days: currentDays }, { merge: true }); // Modular syntax
     setPasteMenuState({ visible: false }); // Close paste menu
-  };
+  }, [db, weekId, collectionPath, clipboard, weekData, weekDays]);
 
   /**
    * Updates the notes for a specific day.
    */
-  const handleUpdateDayNotes = async (day, newNotes) => {
+  const handleUpdateDayNotes = useCallback(async (day, newNotes) => {
     if (!db) {
       console.error("Cannot update notes, DB not connected.");
       return;
@@ -3959,12 +4043,12 @@ const App = () => {
     const weekDocRef = doc(db, collectionPath, weekId); // Modular syntax
     await setDoc(weekDocRef, { days: currentDays }, { merge: true }); // Modular syntax
     // Don't close modal, just update
-  };
+  }, [db, weekId, collectionPath, weekData, weekDays]);
 
   /**
    * Adds a new shift to a specific day.
    */
-  const handleAddShift = async (day, newShift) => {
+  const handleAddShift = useCallback(async (day, newShift) => {
     if (!db) {
       console.error("Cannot add shift, DB not connected.");
       return;
@@ -3984,7 +4068,7 @@ const App = () => {
 
     const weekDocRef = doc(db, collectionPath, weekId); // Modular syntax
     await setDoc(weekDocRef, { days: currentDays }, { merge: true }); // Modular syntax
-  };
+  }, [db, weekId, collectionPath, weekData, weekDays]);
 
   // --- Navigation Handlers ---
   const goToPrevWeek = () => {
