@@ -145,10 +145,10 @@ const DEFAULT_SITE_NAMES = [
   "M.Horn Breaks (26O, 101M, 110S, 1K)",
   
 ];
-const FONT_COLORS = ["#000000", "#FFFFFF", "#FF0000"]; // black, white, red
+const FONT_COLORS = ["#000000", "#FFFFFF", "#5d0909ff"]; // black, white, red
 const FILL_COLORS = ["#FFFFFF", "#008000", "#0000FF", "#000000", "#FFA500", "#800080"]; // white, green, blue, black, orange, purple
 
-const COLOR_COMPLETE_BG = "#32CD32"; // Lighter Green
+const COLOR_COMPLETE_BG = "#6cdc35ff"; // Green for completed shifts
 const COLOR_COMPLETE_FONT = "#FFFFFF"; // White
 const COLOR_OPS_BG = "#6495ED"; // Lighter Blue
 const COLOR_OPS_FONT = "#FFFFFF"; // White
@@ -1180,6 +1180,17 @@ const Shift = ({ shift, onContextMenu, onDoubleClick, topUserInitials }) => {
   }
   const shouldGlow = glowType !== null;
 
+  // Get minimal flaming glow styles for initials - all top 3 get same gold flame effect
+  const getInitialsGlowStyle = () => {
+    if (!glowType) return {};
+    
+    // All top 3 users get the same minimal gold/yellow flame effect - very subtle
+    return {
+      color: "#000000ff", 
+      textShadow: "0 0 1px rgba(225, 210, 38, 0.6), 0 0 4px rgba(242, 251, 0, 0.5)",
+    };
+  };
+
   return (
     <div
       onContextMenu={(e) => {
@@ -1197,31 +1208,13 @@ const Shift = ({ shift, onContextMenu, onDoubleClick, topUserInitials }) => {
         marginBottom: "0.15rem",
         backgroundColor: displayBackground,
         color: displayFont,
-        border: glowType === "titan" 
-          ? "2px solid rgba(139, 92, 246, 0.7)"
-          : glowType === "gold"
-          ? "2px solid rgba(255, 215, 0, 0.7)"
-          : glowType === "silver"
-          ? "2px solid rgba(192, 192, 192, 0.7)"
-          : "1px solid rgba(148, 163, 184, 0.25)",
+        border: "none",
         ...(hasComments && { 
           borderRight: "5px solid #FF8C00",
-          boxShadow: glowType === "titan"
-            ? "inset -2px 0 0 #000000, 0 0 8px rgba(139, 92, 246, 0.6), 0 0 16px rgba(124, 58, 237, 0.4), 0 6px 16px rgba(2, 6, 23, 0.35)"
-            : glowType === "gold"
-            ? "inset -2px 0 0 #000000, 0 0 8px rgba(255, 215, 0, 0.6), 0 0 16px rgba(255, 193, 7, 0.4), 0 6px 16px rgba(2, 6, 23, 0.35)"
-            : glowType === "silver"
-            ? "inset -2px 0 0 #000000, 0 0 8px rgba(192, 192, 192, 0.6), 0 0 16px rgba(169, 169, 169, 0.4), 0 6px 16px rgba(2, 6, 23, 0.35)"
-            : "inset -2px 0 0 #000000, 0 6px 16px rgba(2, 6, 23, 0.35)"
+          boxShadow: "inset -2px 0 0 #000000, 0 6px 16px rgba(2, 6, 23, 0.35)"
         }),
         ...(!hasComments && { 
-          boxShadow: glowType === "titan"
-            ? "0 0 8px rgba(139, 92, 246, 0.6), 0 0 16px rgba(124, 58, 237, 0.4), 0 6px 16px rgba(2, 6, 23, 0.35)"
-            : glowType === "gold"
-            ? "0 0 8px rgba(255, 215, 0, 0.6), 0 0 16px rgba(255, 193, 7, 0.4), 0 6px 16px rgba(2, 6, 23, 0.35)"
-            : glowType === "silver"
-            ? "0 0 8px rgba(192, 192, 192, 0.6), 0 0 16px rgba(169, 169, 169, 0.4), 0 6px 16px rgba(2, 6, 23, 0.35)"
-            : "0 6px 16px rgba(2, 6, 23, 0.35)"
+          boxShadow: "0 6px 16px rgba(2, 6, 23, 0.35)"
         }),
         transition: "transform 0.12s ease, box-shadow 0.12s ease",
       }}
@@ -1251,16 +1244,17 @@ const Shift = ({ shift, onContextMenu, onDoubleClick, topUserInitials }) => {
         </span>
         <span
           className="font-mono font-bold text-sm ml-2 flex-shrink-0"
-            style={{ 
+          style={{ 
             color: displayFont,
             marginLeft: "auto",
             fontWeight: 700,
             textTransform: "uppercase",
             fontSize: "0.92rem",
             lineHeight: isOps ? "1.0" : "inherit",
-            }}
-          >
-            {initials}
+            ...getInitialsGlowStyle(),
+          }}
+        >
+          {initials}
         </span>
       </div>
     </div>
