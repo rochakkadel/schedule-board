@@ -150,7 +150,7 @@ const FILL_COLORS = ["#FFFFFF", "#008000", "#0000FF", "#000000", "#FFA500", "#80
 
 const COLOR_COMPLETE_BG = "#8bf855ff"; // Green for completed shifts
 const COLOR_COMPLETE_FONT = "#FFFFFF"; // White
-const COLOR_OPS_BG = "#6495ED"; // Lighter Blue
+const COLOR_OPS_BG = "#7da6f1ff"; // Lighter Blue
 const COLOR_OPS_FONT = "#FFFFFF"; // White
 const ANALYSIS_URL =
   "https://xxxrkxxxrkxxx-ui.github.io/Analysis/";
