@@ -1292,6 +1292,19 @@ const DayColumn = ({
     });
   }, [shifts]);
 
+  // Calculate open shifts (white background only) and total shifts
+  const { openShifts, totalShifts } = useMemo(() => {
+    const total = shifts.length;
+    const open = shifts.filter(shift => {
+      // A shift is open only if it has white background (not OPS or Complete)
+      const bgColor = shift.bgColor || "#FFFFFF";
+      const normalizedBg = bgColor.toUpperCase();
+      const isWhite = normalizedBg === "#FFFFFF" || normalizedBg === "FFFFFF";
+      return isWhite;
+    }).length;
+    return { openShifts: open, totalShifts: total };
+  }, [shifts]);
+
   return (
     <div 
       className="flex flex-col flex-shrink-0"
@@ -1385,35 +1398,56 @@ const DayColumn = ({
           marginTop: "auto",
         }}
       >
-        {hasAccess && (
-          <button
-            className="flex-grow py-2 text-center text-gray-400 font-bold text-xl rounded-md hover:bg-white hover:text-black transition-colors duration-150 plus-button micro-pressable"
-            onClick={onAddShift}
-            onContextMenu={onPasteMenu}
-            style={{
-              flexGrow: 1,
-              padding: "0.5rem 0",
-              textAlign: "center",
-              color: "#9ca3af",
-              fontWeight: "bold",
-              fontSize: "1.25rem",
-              borderRadius: "0.375rem",
-              backgroundColor: "transparent",
-              border: "none",
-              cursor: "pointer",
-            }}
-            onMouseEnter={(e) => {
-              e.target.style.backgroundColor = "#ffffff";
-              e.target.style.color = "#000000";
-            }}
-            onMouseLeave={(e) => {
-              e.target.style.backgroundColor = "transparent";
-              e.target.style.color = "#9ca3af";
-            }}
-          >
-            +
-          </button>
-        )}
+        <div
+          style={{
+            flexGrow: 1,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: "0.25rem",
+          }}
+        >
+          {hasAccess && (
+            <button
+              className="flex-grow py-2 text-center text-gray-400 font-bold text-xl rounded-md hover:bg-white hover:text-black transition-colors duration-150 plus-button micro-pressable"
+              onClick={onAddShift}
+              onContextMenu={onPasteMenu}
+              style={{
+                width: "100%",
+                padding: "0.5rem 0",
+                textAlign: "center",
+                color: "#9ca3af",
+                fontWeight: "bold",
+                fontSize: "1.25rem",
+                borderRadius: "0.375rem",
+                backgroundColor: "transparent",
+                border: "none",
+                cursor: "pointer",
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.backgroundColor = "#ffffff";
+                e.target.style.color = "#000000";
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.backgroundColor = "transparent";
+                e.target.style.color = "#9ca3af";
+              }}
+            >
+              +
+            </button>
+          )}
+          {totalShifts > 0 && (
+            <span
+              style={{
+                color: openShifts > 0 ? "#ffffff" : "#22c55e",
+                fontSize: "1rem",
+                fontWeight: 600,
+              }}
+            >
+              {openShifts > 0 ? openShifts : totalShifts}
+            </span>
+          )}
+        </div>
         <button
           className="note-button micro-pressable"
           onClick={onDayNotes}
