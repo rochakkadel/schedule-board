@@ -1458,6 +1458,7 @@ const ContextMenu = ({
   onColor,
   onComment,
   onCopy, // New prop
+  onSplit, // New prop for split shift
 }) => {
   const menuRef = useClickOutside(onClose);
 
@@ -1475,6 +1476,7 @@ const ContextMenu = ({
     [
       { label: "Copy Shift", action: onCopy },
       { label: "Edit Shift", action: onEdit },
+      { label: "Split Shift", action: onSplit },
     ],
     [
       {
@@ -2100,6 +2102,234 @@ const EditShiftModal = ({ shift, day, weekId, onClose, onUpdateShift }) => {
 };
 
 /**
+ * Split Shift Modal
+ */
+const SplitShiftModal = ({ shift, day, onClose, onSplitShift }) => {
+  const [splitTime, setSplitTime] = useState("");
+  const [error, setError] = useState("");
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!splitTime) {
+      setError("Split time is required.");
+      return;
+    }
+    if (splitTime.length !== 4) {
+      setError("Time must be in HHMM format.");
+      return;
+    }
+
+    // Validate split time is between start and end time
+    const startTimeNum = parseInt(shift.startTime, 10);
+    const endTimeNum = parseInt(shift.endTime, 10);
+    const splitTimeNum = parseInt(splitTime, 10);
+
+    if (isNaN(splitTimeNum)) {
+      setError("Invalid time format.");
+      return;
+    }
+
+    if (splitTimeNum <= startTimeNum || splitTimeNum >= endTimeNum) {
+      setError(`Split time must be between ${shift.startTime} and ${shift.endTime}.`);
+      return;
+    }
+
+    setError("");
+    onSplitShift(day, shift, splitTime);
+    onClose();
+  };
+
+  return (
+    <Modal onClose={onClose}>
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: "1.5rem",
+        }}
+      >
+        <div>
+          <h3
+            style={{
+              fontSize: "1.5rem",
+              fontWeight: 700,
+              color: "#f8fafc",
+              marginBottom: "0.35rem",
+            }}
+          >
+            Split Shift
+          </h3>
+          <p
+            style={{
+              fontSize: "1.0rem",
+              color: "#94a3b8",
+              margin: 0,
+            }}
+          >
+            Split this shift into two shifts 
+          </p>
+        </div>
+
+        <div
+          style={{
+            padding: "1rem",
+            backgroundColor: "rgba(59, 130, 246, 0.1)",
+            borderRadius: "0.75rem",
+            border: "1px solid rgba(59, 130, 246, 0.2)",
+          }}
+        >
+          <p style={{ color: "#cbd5e1", margin: 0, fontSize: "0.95rem", marginBottom: "0.5rem" }}>
+            Current Shift:
+          </p>
+          <p style={{ color: "#f8fafc", margin: 0, fontSize: "1.1rem", fontWeight: 600 }}>
+            {shift.site} {shift.startTime}-{shift.endTime}
+          </p>
+        </div>
+
+        <form
+          onSubmit={handleSubmit}
+          style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}
+        >
+          <div>
+            <label style={modalLabelStyle}>Start Time</label>
+            <input
+              type="text"
+              value={shift.startTime}
+              disabled
+              style={{
+                ...modalInputStyle,
+                opacity: 0.6,
+                cursor: "not-allowed",
+                fontFamily: "monospace",
+                letterSpacing: "0.08em",
+              }}
+            />
+          </div>
+
+          <div>
+            <label style={modalLabelStyle}>Split Time </label>
+            <input
+              type="text"
+              placeholder="1100"
+              value={splitTime}
+              onChange={(e) => {
+                const value = e.target.value.replace(/\D/g, "").slice(0, 4);
+                setSplitTime(value);
+                setError("");
+              }}
+              maxLength="4"
+              style={{
+                ...modalInputStyle,
+                fontFamily: "monospace",
+                letterSpacing: "0.08em",
+              }}
+              autoFocus
+            />
+            
+          </div>
+
+          <div>
+            <label style={modalLabelStyle}>End Time </label>
+            <input
+              type="text"
+              value={shift.endTime}
+              disabled
+              style={{
+                ...modalInputStyle,
+                opacity: 0.6,
+                cursor: "not-allowed",
+                fontFamily: "monospace",
+                letterSpacing: "0.08em",
+              }}
+            />
+          </div>
+
+          <div
+            style={{
+              padding: "1rem",
+              backgroundColor: "rgba(34, 197, 94, 0.1)",
+              borderRadius: "0.75rem",
+              border: "1px solid rgba(34, 197, 94, 0.2)",
+            }}
+          >
+            <p style={{ color: "#cbd5e1", margin: 0, fontSize: "0.95rem", marginBottom: "0.5rem" }}>
+              Result:
+            </p>
+            {splitTime.length === 4 && !error ? (
+              <>
+                <p style={{ color: "#f8fafc", margin: "0.25rem 0", fontSize: "1rem" }}>
+                  Shift 1: {shift.site} {shift.startTime}-{splitTime}
+                </p>
+                <p style={{ color: "#f8fafc", margin: "0.25rem 0", fontSize: "1rem" }}>
+                  Shift 2: {shift.site} {splitTime}-{shift.endTime}
+                </p>
+              </>
+            ) : (
+              <p style={{ color: "#94a3b8", margin: 0, fontSize: "0.9rem" }}>
+                Enter split time to see preview
+              </p>
+            )}
+          </div>
+
+          {error && (
+            <div
+              style={{
+                padding: "0.75rem",
+                borderRadius: "0.75rem",
+                backgroundColor: "rgba(239, 68, 68, 0.15)",
+                color: "#fca5a5",
+                fontSize: "0.95rem",
+              }}
+            >
+              {error}
+            </div>
+          )}
+
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "flex-end",
+              gap: "0.75rem",
+              marginTop: "0.5rem",
+            }}
+          >
+            <button
+              type="button"
+              onClick={onClose}
+              style={modalSecondaryButtonStyle}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.border = "1px solid rgba(148, 163, 184, 0.55)";
+                e.currentTarget.style.color = "#f8fafc";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.border = "1px solid rgba(148, 163, 184, 0.35)";
+                e.currentTarget.style.color = "#e2e8f0";
+              }}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              style={modalPrimaryButtonStyle}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = "translateY(-1px)";
+                e.currentTarget.style.boxShadow = "0 12px 24px rgba(37, 99, 235, 0.25)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = "none";
+                e.currentTarget.style.boxShadow = "none";
+              }}
+            >
+              Split Shift
+            </button>
+          </div>
+        </form>
+      </div>
+    </Modal>
+  );
+};
+
+/**
  * Color Picker Modal
  */
 const ColorModal = ({ shift, day, onClose, onUpdateShift }) => {
@@ -2183,7 +2413,7 @@ const ColorModal = ({ shift, day, onClose, onUpdateShift }) => {
               margin: 0,
             }}
           >
-            Personalize how this shift appears on the board. Preview updates in real time.
+           
           </p>
         </div>
 
@@ -3066,7 +3296,7 @@ const DayNotesModal = ({
               marginBottom: "0.2rem",
             }}
           >
-             Notes · {formatDateHeader(day.date)}
+             Notes / Call Offs | {formatDateHeader(day.date)}
       </h3>
           <p
             style={{
@@ -3551,6 +3781,7 @@ const App = () => {
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalContent, setModalContent] = useState(null);
+  const [currentModalType, setCurrentModalType] = useState(null); // Track which modal is open: 'addShift', 'dayNotes', etc.
   const [contextMenu, setContextMenu] = useState({
     visible: false,
     x: 0,
@@ -4070,6 +4301,60 @@ const App = () => {
     await setDoc(weekDocRef, { days: currentDays }, { merge: true }); // Modular syntax
   }, [db, weekId, collectionPath, weekData, weekDays]);
 
+  /**
+   * Splits a shift into two shifts at the specified split time.
+   */
+  const handleSplitShift = useCallback(async (day, originalShift, splitTime) => {
+    if (!db) {
+      console.error("Cannot split shift, DB not connected.");
+      return;
+    }
+
+    const dayString = getDateKey(day.date);
+    const currentDays = await getWeekDoc();
+    const dayIndex = currentDays.findIndex((d) => d.date === dayString);
+
+    if (dayIndex === -1) {
+      console.error("Day not found in week data.");
+      return;
+    }
+
+    // Ensure shifts array exists
+    currentDays[dayIndex].shifts = currentDays[dayIndex].shifts || [];
+
+    // Find the original shift index
+    const originalShiftIndex = currentDays[dayIndex].shifts.findIndex(
+      (s) => s.id === originalShift.id
+    );
+
+    if (originalShiftIndex === -1) {
+      console.error("Original shift not found.");
+      return;
+    }
+
+    // Create first shift: original startTime to splitTime
+    const firstShift = {
+      ...originalShift,
+      id: crypto.randomUUID(),
+      startTime: originalShift.startTime,
+      endTime: splitTime,
+    };
+
+    // Create second shift: splitTime to original endTime
+    const secondShift = {
+      ...originalShift,
+      id: crypto.randomUUID(),
+      startTime: splitTime,
+      endTime: originalShift.endTime,
+    };
+
+    // Remove the original shift and insert the two new shifts at the same position
+    currentDays[dayIndex].shifts.splice(originalShiftIndex, 1, firstShift, secondShift);
+
+    const weekDocRef = doc(db, collectionPath, weekId); // Modular syntax
+    await setDoc(weekDocRef, { days: currentDays }, { merge: true }); // Modular syntax
+  }, [db, weekId, collectionPath, weekData, weekDays]);
+
   // --- Navigation Handlers ---
   const goToPrevWeek = () => {
     setCurrentDate((prev) => {
@@ -4105,13 +4390,15 @@ const App = () => {
   };
 
   // --- Modal Handlers ---
-  const openModal = (content) => {
+  const openModal = (content, modalType = null) => {
     setModalContent(content);
     setIsModalOpen(true);
+    setCurrentModalType(modalType);
   };
   const closeModal = () => {
     setIsModalOpen(false);
     setModalContent(null);
+    setCurrentModalType(null);
     setContextMenu({ visible: false });
     setPasteMenuState({ visible: false }); // Close paste menu too
   };
@@ -4130,7 +4417,8 @@ const App = () => {
         day={day}
         onClose={closeModal}
         onAddShift={handleAddShift}
-      />
+      />,
+      'addShift'
     );
   };
   const openEditShiftModal = (day, shift) => {
@@ -4180,6 +4468,16 @@ const App = () => {
       />
     );
   };
+  const openSplitShiftModal = (day, shift) => {
+    openModal(
+      <SplitShiftModal
+        shift={shift}
+        day={day}
+        onClose={closeModal}
+        onSplitShift={handleSplitShift}
+      />
+    );
+  };
   const openRegisteredUsersModal = () => {
     openModal(
       <RegisteredUsersModal
@@ -4200,7 +4498,8 @@ const App = () => {
         userInfo={userInfo}
         isAdmin={isAdmin}
         registeredUsers={registeredUsers}
-      />
+      />,
+      'dayNotes'
     );
   };
 
@@ -4287,6 +4586,14 @@ const App = () => {
     setContextMenu({ visible: false });
   };
 
+  const handleContextSplit = () => {
+    const { day, shift } = contextMenu;
+    if (day && shift) {
+      openSplitShiftModal(day, shift);
+    }
+    setContextMenu({ visible: false });
+  };
+
   // New handler for the '+' button's context menu
   const handlePasteMenu = (e, day) => {
     e.preventDefault();
@@ -4317,6 +4624,96 @@ const App = () => {
       setRegisteredUsers([]);
     }
   }, [clearUserInfo]);
+
+  // --- Keyboard Shortcuts ---
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // Don't trigger shortcuts if:
+      // 1. User is typing in an input, textarea, or contenteditable element
+      // 2. User is holding Ctrl/Cmd or Alt (to allow normal shortcuts)
+      const target = e.target;
+      const isInputElement = 
+        target.tagName === 'INPUT' || 
+        target.tagName === 'TEXTAREA' || 
+        target.isContentEditable ||
+        target.closest('input') ||
+        target.closest('textarea') ||
+        target.closest('[contenteditable="true"]');
+      
+      if (isInputElement || e.ctrlKey || e.metaKey || e.altKey) {
+        return;
+      }
+
+      const key = e.key.toLowerCase();
+      const isToggleKey = key === 't' || key === 'c';
+      
+      // For non-toggle keys (j, k), don't work when modal is open
+      if (!isToggleKey && isModalOpen) {
+        return;
+      }
+
+      // Get current day (today) from weekData.days
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const todayKey = getDateKey(today);
+      const currentDay = weekData.days?.find((day) => {
+        const dayKey = day.dateString || getDateKey(day.date);
+        return dayKey === todayKey;
+      });
+
+      // If not found in weekData, try weekDays as fallback
+      const fallbackDay = !currentDay ? weekDays.find((day) => {
+        const dayDate = new Date(day.date);
+        dayDate.setHours(0, 0, 0, 0);
+        return dayDate.getTime() === today.getTime();
+      }) : null;
+
+      const dayToUse = currentDay || fallbackDay;
+
+      switch (key) {
+        case 't':
+          // Toggle add shift modal for current day
+          if (dayToUse && hasAccess) {
+            e.preventDefault();
+            if (isModalOpen && currentModalType === 'addShift') {
+              closeModal();
+            } else {
+              openAddShiftModal(dayToUse);
+            }
+          }
+          break;
+        case 'j':
+          // Go to previous week
+          e.preventDefault();
+          goToPrevWeek();
+          break;
+        case 'k':
+          // Go to next week
+          e.preventDefault();
+          goToNextWeek();
+          break;
+        case 'c':
+          // Toggle notes for current day
+          if (dayToUse) {
+            e.preventDefault();
+            if (isModalOpen && currentModalType === 'dayNotes') {
+              closeModal();
+            } else {
+              const notes = currentDay?.notes || dayToUse.notes || [];
+              openDayNotesModal(dayToUse, notes);
+            }
+          }
+          break;
+        default:
+          break;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [weekDays, weekData, hasAccess, isModalOpen, currentModalType, openAddShiftModal, goToPrevWeek, goToNextWeek, openDayNotesModal, closeModal]);
 
   // --- Render ---
   if (!isAuthReady) {
@@ -4459,6 +4856,7 @@ const App = () => {
         onColor={handleContextColor}
         onComment={handleContextComment}
         onCopy={handleContextCopy}
+        onSplit={handleContextSplit}
       />
 
       {/* Context Menu for Pasting */}
