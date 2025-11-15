@@ -1,4 +1,4 @@
-# Schedule Board — Legal & Technical Overview
+#Legal & Technical Overview
 
 
 ## Overview
