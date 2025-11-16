@@ -11,6 +11,7 @@ import {
   doc,
   getDoc,
   setDoc,
+  deleteDoc,
   onSnapshot,
   collection,
   setLogLevel,
@@ -154,6 +155,8 @@ const COLOR_OPS_BG = "#7da6f1ff"; // Lighter Blue
 const COLOR_OPS_FONT = "#FFFFFF"; // White
 const ANALYSIS_URL =
   "https://xxxrkxxxrkxxx-ui.github.io/Analysis/";
+const RESEARCH_URL =
+  "https://paladinsec-my.sharepoint.com/:x:/r/personal/bperry_palamerican_com1/_layouts/15/doc2.aspx?sourcedoc=%7BF4F6F36A-BECE-4618-ADAC-D38D7AE20154%7D&file=Site%20Trained%20Officers.xlsx&action=default&mobileredirect=true&DefaultItemOpen=1";
 const SITE_MANAGER_URL =
   "https://xxxrkxxxrkxxx-ui.github.io/KadelSiteManager/";
 const SITE_DIRECTORY_DOC_PATH = [
@@ -746,6 +749,7 @@ const Header = ({
   userInfo,
   hasAccess,
   onOpenAnalysis,
+  onOpenResearch,
   onOpenSiteManager,
   showSettings,
   onOpenSettings,
@@ -871,6 +875,26 @@ const Header = ({
         >
           Analysis
         </button>
+        {userInfo && userInfo.userId && (
+          <button
+            className="micro-pressable micro-pill"
+            type="button"
+            onClick={onOpenResearch}
+            style={linkButtonStyle}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.border = "1px solid rgba(251, 191, 36, 0.75)";
+              e.currentTarget.style.color = "#fde68a";
+              e.currentTarget.style.transform = "translateY(-1px)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.border = "1px solid rgba(148, 163, 184, 0.45)";
+              e.currentTarget.style.color = "#e2e8f0";
+              e.currentTarget.style.transform = "none";
+            }}
+          >
+            Research
+          </button>
+        )}
         <button
           className="micro-pressable micro-pill"
           type="button"
@@ -3693,7 +3717,7 @@ const DayNotesModal = ({
 /**
  * Registered Users Modal
  */
-const RegisteredUsersModal = ({ users, onClose }) => {
+const RegisteredUsersModal = ({ users, onClose, onDeleteUser, isAdmin }) => {
   const sortedUsers = useMemo(() => {
     return [...users].sort((a, b) => {
       const nameA = `${a.lastName || ""}${a.firstName || ""}`.toLowerCase();
@@ -3714,7 +3738,7 @@ const RegisteredUsersModal = ({ users, onClose }) => {
               marginBottom: "0.25rem",
             }}
           >
-            Registered Accounts
+            ADMIN PANEL - Registered Accounts
           </h3>
           <p
             style={{
@@ -3723,7 +3747,7 @@ const RegisteredUsersModal = ({ users, onClose }) => {
               margin: 0,
             }}
           >
-            Overview of every profile that has signed in on this device.
+            
           </p>
         </div>
 
@@ -3740,7 +3764,7 @@ const RegisteredUsersModal = ({ users, onClose }) => {
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "1.2fr 0.8fr 0.8fr 1.2fr",
+              gridTemplateColumns: isAdmin ? "1.2fr 0.8fr 0.8fr 1.2fr 0.6fr" : "1.2fr 0.8fr 0.8fr 1.2fr",
               padding: "0.85rem 1rem",
               textTransform: "uppercase",
               letterSpacing: "0.05em",
@@ -3753,6 +3777,7 @@ const RegisteredUsersModal = ({ users, onClose }) => {
             <span>Initials</span>
             <span>Role</span>
             <span>Created</span>
+            {isAdmin && <span>Action</span>}
           </div>
           {sortedUsers.length === 0 ? (
             <div
@@ -3771,7 +3796,7 @@ const RegisteredUsersModal = ({ users, onClose }) => {
                 key={`${user.userId}-${user.initials}`}
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "1.2fr 0.8fr 0.8fr 1.2fr",
+                  gridTemplateColumns: isAdmin ? "1.2fr 0.8fr 0.8fr 1.2fr 0.6fr" : "1.2fr 0.8fr 0.8fr 1.2fr",
                   padding: "0.9rem 1rem",
                   borderBottom: "1px solid rgba(148, 163, 184, 0.12)",
                   color: "#e2e8f0",
@@ -3790,6 +3815,36 @@ const RegisteredUsersModal = ({ users, onClose }) => {
                 <span style={{ fontSize: "0.8rem", color: "#94a3b8" }}>
                   {formatTimestamp(user.createdAt)}
                 </span>
+                {isAdmin && (
+                  <button
+                    onClick={() => {
+                      if (window.confirm(`Are you sure you want to delete ${user.firstName || ""} ${user.lastName || ""} (${user.initials})? This action cannot be undone.`)) {
+                        onDeleteUser(user);
+                      }
+                    }}
+                    style={{
+                      padding: "0.4rem 0.6rem",
+                      borderRadius: "0.375rem",
+                      border: "1px solid rgba(239, 68, 68, 0.5)",
+                      backgroundColor: "rgba(239, 68, 68, 0.1)",
+                      color: "#fca5a5",
+                      fontSize: "0.75rem",
+                      fontWeight: 600,
+                      cursor: "pointer",
+                      transition: "all 0.15s ease",
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = "rgba(239, 68, 68, 0.2)";
+                      e.currentTarget.style.borderColor = "rgba(239, 68, 68, 0.7)";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = "rgba(239, 68, 68, 0.1)";
+                      e.currentTarget.style.borderColor = "rgba(239, 68, 68, 0.5)";
+                    }}
+                  >
+                    Delete
+                  </button>
+                )}
               </div>
             ))
           )}
@@ -3937,6 +3992,11 @@ const App = () => {
   const handleOpenAnalysis = useCallback(() => {
     if (typeof window !== "undefined") {
       window.open(ANALYSIS_URL, "_blank", "noopener,noreferrer");
+    }
+  }, []);
+  const handleOpenResearch = useCallback(() => {
+    if (typeof window !== "undefined") {
+      window.open(RESEARCH_URL, "_blank", "noopener,noreferrer");
     }
   }, []);
   const handleOpenSiteManager = useCallback(() => {
@@ -4566,11 +4626,39 @@ const App = () => {
       />
     );
   };
+  // Delete user handler
+  const handleDeleteUser = useCallback(async (userToDelete) => {
+    const currentIsAdmin = Boolean(userInfo?.isAdmin);
+    if (!db || !currentIsAdmin) {
+      console.error("Cannot delete user: DB not connected or user is not admin.");
+      alert("You do not have permission to delete users.");
+      return;
+    }
+
+    try {
+      // Delete from Firestore
+      const collectionPath = REGISTERED_USERS_COLLECTION.split('/').filter(Boolean);
+      const userDocRef = doc(db, ...collectionPath, userToDelete.userId);
+      await deleteDoc(userDocRef);
+
+      // Update local state
+      setRegisteredUsers((prev) => prev.filter(u => u.userId !== userToDelete.userId));
+
+      console.log(`User ${userToDelete.initials} deleted successfully.`);
+    } catch (error) {
+      console.error("Error deleting user:", error);
+      alert("Failed to delete user. Please try again.");
+    }
+  }, [db, userInfo]);
+
   const openRegisteredUsersModal = () => {
+    const currentIsAdmin = Boolean(userInfo?.isAdmin);
     openModal(
       <RegisteredUsersModal
         users={registeredUsers}
         onClose={closeModal}
+        onDeleteUser={handleDeleteUser}
+        isAdmin={currentIsAdmin}
       />
     );
   };
@@ -4860,6 +4948,7 @@ const App = () => {
         userInfo={userInfo}
         hasAccess={hasAccess}
         onOpenAnalysis={handleOpenAnalysis}
+        onOpenResearch={handleOpenResearch}
         onOpenSiteManager={handleOpenSiteManager}
         showSettings={Boolean(userInfo?.isAdmin)}
         onOpenSettings={openRegisteredUsersModal}
