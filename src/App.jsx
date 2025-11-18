@@ -1509,7 +1509,8 @@ const ContextMenu = ({
   onOps,
   onColor,
   onComment,
-  onCopy, // New prop
+  onCopy, // Copy shift data for pasting
+  onCopyToClipboard, // Copy text to system clipboard
   onSplit, // New prop for split shift
 }) => {
   const menuRef = useClickOutside(onClose);
@@ -1533,37 +1534,36 @@ const ContextMenu = ({
       const rect = menu.getBoundingClientRect();
       const windowWidth = window.innerWidth;
       const windowHeight = window.innerHeight;
+      const padding = 10;
       
-      setAdjustedPosition(prev => {
-        let newX = prev.x;
-        let newY = prev.y;
-        
-        // Adjust horizontal position if menu goes off right edge
-        if (rect.right > windowWidth) {
-          newX = windowWidth - rect.width - 10; // 10px padding from edge
-        }
-        
-        // Adjust horizontal position if menu goes off left edge
-        if (rect.left < 0 || newX < 10) {
-          newX = Math.max(10, windowWidth - rect.width - 10);
-        }
-        
-        // Adjust vertical position if menu goes off bottom edge
-        if (rect.bottom > windowHeight) {
-          newY = windowHeight - rect.height - 10; // 10px padding from edge
-        }
-        
-        // Adjust vertical position if menu goes off top edge
-        if (rect.top < 0 || newY < 10) {
-          newY = Math.max(10, windowHeight - rect.height - 10);
-        }
-        
-        // Only update if position changed to avoid unnecessary re-renders
-        if (prev.x === newX && prev.y === newY) {
-          return prev;
-        }
-        return { x: newX, y: newY };
-      });
+      let newX = menuState.x;
+      let newY = menuState.y;
+      
+      // Adjust horizontal position if menu goes off right edge
+      if (rect.right > windowWidth - padding) {
+        newX = windowWidth - rect.width - padding;
+      }
+      
+      // Adjust horizontal position if menu goes off left edge
+      if (rect.left < padding) {
+        newX = padding;
+      }
+      
+      // Adjust vertical position if menu goes off bottom edge
+      if (rect.bottom > windowHeight - padding) {
+        newY = windowHeight - rect.height - padding;
+      }
+      
+      // Adjust vertical position if menu goes off top edge
+      if (rect.top < padding) {
+        newY = padding;
+      }
+      
+      // Ensure menu doesn't go off screen in any direction
+      newX = Math.max(padding, Math.min(newX, windowWidth - rect.width - padding));
+      newY = Math.max(padding, Math.min(newY, windowHeight - rect.height - padding));
+      
+      setAdjustedPosition({ x: newX, y: newY });
     };
     
     // Use requestAnimationFrame to ensure rendering is complete
@@ -1580,15 +1580,13 @@ const ContextMenu = ({
     [
       { label: "✅ Complete", action: onComplete },
       { label: "⚙️ OPS", action: onOps },
-    ],
-    [
-      { label: "Comment", action: onComment },
-      { label: "Change Colors", action: onColor },
-    ],
-    [
-      { label: "Copy Shift", action: onCopy },
       { label: "Edit Shift", action: onEdit },
       { label: "Split Shift", action: onSplit },
+    ],
+    [
+      { label: "Change Color", action: onColor },
+      { label: "Copy Shift", action: onCopy },
+      { label: "Copy to Clipboard", action: onCopyToClipboard },
     ],
     [
       {
@@ -4375,32 +4373,45 @@ const App = () => {
   /**
    * Pastes a shift into a day.
    */
-  const handlePasteShift = useCallback(async () => {
-    const { day } = pasteMenuState;
-    if (!db || !day || !clipboard) {
-      console.error("Cannot paste shift, DB, day, or clipboard missing.");
+  const handlePasteShift = async () => {
+    const pasteDay = pasteMenuState.day;
+    if (!db || !pasteDay || !clipboard) {
+      console.error("Cannot paste shift, DB, day, or clipboard missing.", { db: !!db, day: !!pasteDay, clipboard: !!clipboard });
+      alert("Cannot paste shift. Please copy a shift first and right-click on the '+' button.");
       return;
     }
 
-    // Create a new shift object with a new ID
-    const newShift = { ...clipboard, id: crypto.randomUUID() };
+    try {
+      // Create a new shift object with a new ID
+      const newShift = { ...clipboard, id: crypto.randomUUID() };
 
-    const dayString = getDateKey(day.date);
-    const currentDays = await getWeekDoc();
-    const dayIndex = currentDays.findIndex((d) => d.date === dayString);
+      const dayString = getDateKey(pasteDay.date);
+      const currentDays = await getWeekDoc();
+      const dayIndex = currentDays.findIndex((d) => d.date === dayString);
 
-    if (dayIndex === -1) return; // Day not found
+      if (dayIndex === -1) {
+        console.error("Day not found:", dayString, "Available days:", currentDays.map(d => d.date));
+        alert(`Day not found: ${dayString}`);
+        return;
+      }
 
-    // Ensure shifts array exists
-    currentDays[dayIndex].shifts = currentDays[dayIndex].shifts || [];
+      // Ensure shifts array exists
+      if (!currentDays[dayIndex].shifts) {
+        currentDays[dayIndex].shifts = [];
+      }
 
-    // Add the new shift to the day's shifts array
-    currentDays[dayIndex].shifts.push(newShift);
+      // Add the new shift to the day's shifts array
+      currentDays[dayIndex].shifts.push(newShift);
 
-    const weekDocRef = doc(db, collectionPath, weekId); // Modular syntax
-    await setDoc(weekDocRef, { days: currentDays }, { merge: true }); // Modular syntax
-    setPasteMenuState({ visible: false }); // Close paste menu
-  }, [db, weekId, collectionPath, clipboard, weekData, weekDays]);
+      const weekDocRef = doc(db, collectionPath, weekId);
+      await setDoc(weekDocRef, { days: currentDays }, { merge: true });
+      setPasteMenuState({ visible: false }); // Close paste menu
+      console.log("Shift pasted successfully to day:", dayString);
+    } catch (error) {
+      console.error("Error pasting shift:", error);
+      alert(`Failed to paste shift: ${error.message}`);
+    }
+  };
 
   /**
    * Updates the notes for a specific day.
@@ -4748,15 +4759,30 @@ const App = () => {
     setContextMenu({ visible: false });
   };
 
+  // Copy shift data for pasting within the app
   const handleContextCopy = () => {
     const { shift } = contextMenu;
     if (shift) {
-      setClipboard(shift); // Copy shift data to state
+      // Copy shift data to state for pasting within the app
+      setClipboard({ ...shift }); // Make a copy to avoid reference issues
+    }
+    setContextMenu({ visible: false });
+  };
+
+  // Copy shift text to system clipboard
+  const handleContextCopyToClipboard = () => {
+    const { shift } = contextMenu;
+    if (shift) {
       const details = `${shift.site} ${shift.startTime}-${shift.endTime}`;
       if (navigator.clipboard?.writeText) {
-        navigator.clipboard.writeText(details).catch((err) => {
+        navigator.clipboard.writeText(details).then(() => {
+          console.log("Shift details copied to clipboard");
+        }).catch((err) => {
           console.warn("Unable to write shift details to clipboard:", err);
+          alert("Failed to copy to clipboard. Please try again.");
         });
+      } else {
+        alert("Clipboard API not available in this browser.");
       }
     }
     setContextMenu({ visible: false });
@@ -4768,6 +4794,65 @@ const App = () => {
       openSplitShiftModal(day, shift);
     }
     setContextMenu({ visible: false });
+  };
+
+  // Paste shift onto an existing shift (replace it)
+  const handlePasteShiftOntoShift = async () => {
+    if (!db || !clipboard) {
+      console.error("Cannot paste shift, DB or clipboard missing.");
+      alert("No shift copied. Please copy a shift first.");
+      return;
+    }
+
+    // Get current contextMenu at call time (read from state directly)
+    const menuDay = contextMenu.day;
+    const menuShift = contextMenu.shift;
+    
+    if (!menuDay || !menuShift) {
+      console.error("Cannot paste shift, day or shift missing from context menu.", { day: menuDay, shift: menuShift });
+      alert("Cannot paste shift. Please right-click on a shift to paste.");
+      return;
+    }
+
+    try {
+      // Create a new shift object with a new ID
+      const newShift = { ...clipboard, id: crypto.randomUUID() };
+
+      // Use the same pattern as handleUpdateShift
+      const dayString = getDateKey(menuDay.date);
+      const currentDays = await getWeekDoc();
+      const dayIndex = currentDays.findIndex((d) => d.date === dayString);
+
+      if (dayIndex === -1) {
+        console.error("Day not found:", dayString, "Available days:", currentDays.map(d => d.date));
+        alert(`Day not found: ${dayString}`);
+        return;
+      }
+
+      // Ensure shifts array exists
+      if (!currentDays[dayIndex].shifts) {
+        currentDays[dayIndex].shifts = [];
+      }
+
+      // Find and replace the existing shift
+      const shiftIndex = currentDays[dayIndex].shifts.findIndex((s) => s.id === menuShift.id);
+      if (shiftIndex === -1) {
+        console.error("Shift not found:", menuShift.id, "Available shifts:", currentDays[dayIndex].shifts.map(s => s.id));
+        alert(`Shift not found in day. Please try again.`);
+        return;
+      }
+
+      // Replace the shift at this index
+      currentDays[dayIndex].shifts[shiftIndex] = newShift;
+
+      const weekDocRef = doc(db, collectionPath, weekId);
+      await setDoc(weekDocRef, { days: currentDays }, { merge: true });
+      setContextMenu({ visible: false }); // Close context menu
+      console.log("Shift pasted successfully");
+    } catch (error) {
+      console.error("Error pasting shift:", error);
+      alert(`Failed to paste shift: ${error.message}`);
+    }
   };
 
   // New handler for the '+' button's context menu
@@ -5033,7 +5118,9 @@ const App = () => {
         onColor={handleContextColor}
         onComment={handleContextComment}
         onCopy={handleContextCopy}
+        onCopyToClipboard={handleContextCopyToClipboard}
         onSplit={handleContextSplit}
+        hasClipboard={!!clipboard}
       />
 
       {/* Context Menu for Pasting */}
