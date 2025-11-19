@@ -751,6 +751,7 @@ const Header = ({
   onOpenAnalysis,
   onOpenResearch,
   onOpenSiteManager,
+  onOpenSummary,
   showSettings,
   onOpenSettings,
   onLogout,
@@ -913,6 +914,26 @@ const Header = ({
         >
           Site Manager
         </button>
+        {isAdmin && (
+          <button
+            className="micro-pressable micro-pill"
+            type="button"
+            onClick={onOpenSummary}
+            style={linkButtonStyle}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.border = "1px solid rgba(251, 146, 60, 0.75)";
+              e.currentTarget.style.color = "#fbbf24";
+              e.currentTarget.style.transform = "translateY(-1px)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.border = "1px solid rgba(148, 163, 184, 0.45)";
+              e.currentTarget.style.color = "#e2e8f0";
+              e.currentTarget.style.transform = "none";
+            }}
+          >
+            Summary
+          </button>
+        )}
       </div>
 
       <div
@@ -1756,7 +1777,7 @@ const Modal = ({ children, onClose }) => {
           borderRadius: "0.75rem",
           boxShadow: "0 20px 45px rgba(0,0,0,0.45)",
           width: "100%",
-          maxWidth: "480px",
+          maxWidth: "72rem",
         }}
       >
         {children}
@@ -3713,6 +3734,627 @@ const DayNotesModal = ({
 };
 
 /**
+ * Summary Modal Component
+ */
+const SummaryModal = ({ weekData, onClose, isAdmin, weekId, onOpenDetails }) => {
+  // Calculate hours from time string (e.g., "0800", "1600")
+  const timeToHours = (timeStr) => {
+    if (!timeStr || typeof timeStr !== 'string') return 0;
+    const upperTime = timeStr.toUpperCase();
+    // Skip xxxx times
+    if (upperTime === 'XXXX') return 0;
+    
+    // Parse time string (format: "HHMM" or "HH:MM")
+    const cleanTime = timeStr.replace(/[^0-9]/g, '');
+    if (cleanTime.length !== 4) return 0;
+    
+    const hours = parseInt(cleanTime.substring(0, 2), 10);
+    const minutes = parseInt(cleanTime.substring(2, 4), 10);
+    
+    return hours + (minutes / 60);
+  };
+
+  // Calculate shift hours
+  const calculateShiftHours = (startTime, endTime) => {
+    const start = timeToHours(startTime);
+    const end = timeToHours(endTime);
+    
+    if (start === 0 || end === 0) return 0;
+    
+    // Handle overnight shifts (end < start)
+    let hours = end - start;
+    if (hours < 0) {
+      hours = (24 - start) + end;
+    }
+    
+    return hours;
+  };
+
+  // Calculate statistics
+  const stats = useMemo(() => {
+    let totalHours = 0;
+    let opsHours = 0;
+    let noCoverageHours = 0;
+
+    if (!weekData || !weekData.days) {
+      return { totalHours: 0, opsHours: 0, noCoverageHours: 0 };
+    }
+
+    weekData.days.forEach(day => {
+      if (!day.shifts || !Array.isArray(day.shifts)) return;
+
+      day.shifts.forEach(shift => {
+        const startTime = shift.startTime || '';
+        const endTime = shift.endTime || '';
+        const upperStart = startTime.toUpperCase();
+        const upperEnd = endTime.toUpperCase();
+
+        // Skip shifts with xxxx time
+        if (upperStart === 'XXXX' || upperEnd === 'XXXX') return;
+
+        const shiftHours = calculateShiftHours(startTime, endTime);
+        if (shiftHours <= 0) return;
+
+        const bgColor = shift.bgColor || '#FFFFFF';
+        const normalizedBg = bgColor.toUpperCase();
+
+        // Check if it's OPS (blue background)
+        const isOps = normalizedBg === COLOR_OPS_BG.toUpperCase();
+
+        // Check if it's no coverage (black background)
+        const isNoCoverage = normalizedBg === '#000000' || normalizedBg === '000000';
+
+        totalHours += shiftHours;
+
+        if (isOps) {
+          opsHours += shiftHours;
+        } else if (isNoCoverage) {
+          noCoverageHours += shiftHours;
+        }
+      });
+    });
+
+    return { totalHours, opsHours, noCoverageHours };
+  }, [weekData]);
+
+  const maxHours = Math.max(stats.totalHours, stats.opsHours, stats.noCoverageHours, 1);
+  const barContainerHeight = 250; // Fixed height in pixels
+
+  // Calculate bar heights in pixels - use exact proportions without minimums for accurate scaling
+  const totalBarHeight = maxHours > 0 && stats.totalHours > 0 ? (stats.totalHours / maxHours) * barContainerHeight : 0;
+  const opsBarHeight = maxHours > 0 && stats.opsHours > 0 ? (stats.opsHours / maxHours) * barContainerHeight : 0;
+  const noCoverageBarHeight = maxHours > 0 && stats.noCoverageHours > 0 ? (stats.noCoverageHours / maxHours) * barContainerHeight : 0;
+
+  return (
+    <Modal onClose={onClose}>
+      <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem", width: "100%", maxWidth: "72rem" }}>
+        <div>
+          <h3
+            style={{
+              fontSize: "1.5rem",
+              fontWeight: 700,
+              color: "#f8fafc",
+              marginBottom: "0.25rem",
+            }}
+          >
+            Week Summary
+          </h3>
+          <p
+            style={{
+              fontSize: "1.0rem",
+              color: "#94a3b8",
+              margin: 0,
+            }}
+          >
+
+          </p>
+        </div>
+
+        <div style={{ display: "flex", gap: "2rem", alignItems: "flex-start" }}>
+          {/* Terminal-style text panel */}
+          <div
+            style={{
+              flex: 1,
+              backgroundColor: "#000000",
+              border: "2px solid #00ff00",
+              borderRadius: "0.5rem",
+              padding: "2rem",
+              fontFamily: "monospace",
+              fontSize: "1.2rem",
+              color: "#00ff00",
+              boxShadow: "0 0 20px rgba(0, 255, 0, 0.3), inset 0 0 20px rgba(0, 255, 0, 0.1)",
+              minHeight: "300px",
+            }}
+          >
+            <div style={{ marginBottom: "1.5rem", color: "#00ff00" }}>
+              <span style={{ color: "#00ffff" }}></span> 
+            </div>
+            <div style={{ marginBottom: "1rem", lineHeight: "2" }}>
+              <span style={{ color: "#00ff00" }}>Total Shifts:</span>{" "}
+              <span style={{ color: "#00ff00" }}>{stats.totalHours.toFixed(1)} hrs</span>
+            </div>
+            <div style={{ marginBottom: "1rem", lineHeight: "2" }}>
+              <span style={{ color: "#00ff00" }}>OPS Coverage:</span>{" "}
+              <span style={{ color: "#00ff00" }}>{stats.opsHours.toFixed(1)} hrs</span>
+            </div>
+            <div style={{ marginBottom: "1rem", lineHeight: "2" }}>
+              <span style={{ color: "#00ff00" }}>No Coverage:</span>{" "}
+              <span style={{ color: "#00ff00" }}>{stats.noCoverageHours.toFixed(1)} hrs</span>
+            </div>
+            <div style={{ marginTop: "1.5rem", color: "#00ff00", fontSize: "1rem" }}>
+              <span style={{ color: "#00ffff" }}></span>
+            </div>
+          </div>
+
+          {/* Vertical Bar chart visualization */}
+          <div
+            style={{
+              flex: 1,
+              display: "flex",
+              flexDirection: "column",
+              gap: "2rem",
+              padding: "2rem",
+              backgroundColor: "rgba(15, 23, 42, 0.6)",
+              borderRadius: "0.75rem",
+              border: "1px solid rgba(148, 163, 184, 0.18)",
+              minHeight: "300px",
+              justifyContent: "flex-end",
+            }}
+          >
+            <div style={{ fontSize: "1.1rem", fontWeight: 600, color: "#f8fafc", marginBottom: "1rem" }}>
+
+            </div>
+
+            <div style={{ display: "flex", gap: "2rem", alignItems: "flex-end", height: `${barContainerHeight}px`, position: "relative", paddingBottom: "2rem" }}>
+              {/* Total Shifts Bar */}
+              <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: "0.5rem", height: `${barContainerHeight}px`, justifyContent: "flex-end" }}>
+                {stats.totalHours > 0 && (
+                  <span style={{ fontSize: "0.85rem", color: "#f8fafc", fontWeight: 600, marginBottom: "0.25rem" }}>
+                    {stats.totalHours.toFixed(1)}h
+                  </span>
+                )}
+                <div
+                  style={{
+                    width: "100%",
+                    height: `${totalBarHeight}px`,
+                    backgroundColor: "#22c55e",
+                    borderRadius: "0.375rem 0.375rem 0 0",
+                    border: "2px solid rgba(34, 197, 94, 0.6)",
+                    transition: "height 0.5s ease",
+                    display: stats.totalHours > 0 ? "block" : "none",
+                  }}
+                />
+                <span style={{ fontSize: "0.9rem", color: "#94a3b8", fontWeight: 500 }}>Total</span>
+              </div>
+
+              {/* OPS Coverage Bar */}
+              <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: "0.5rem", height: `${barContainerHeight}px`, justifyContent: "flex-end" }}>
+                {stats.opsHours > 0 && (
+                  <span style={{ fontSize: "0.85rem", color: "#f8fafc", fontWeight: 600, marginBottom: "0.25rem" }}>
+                    {stats.opsHours.toFixed(1)}h
+                  </span>
+                )}
+                <div
+                  style={{
+                    width: "100%",
+                    height: `${opsBarHeight}px`,
+                    backgroundColor: "#3b82f6",
+                    borderRadius: "0.375rem 0.375rem 0 0",
+                    border: "2px solid rgba(59, 130, 246, 0.6)",
+                    transition: "height 0.5s ease",
+                    display: stats.opsHours > 0 ? "block" : "none",
+                  }}
+                />
+                <span style={{ fontSize: "0.9rem", color: "#94a3b8", fontWeight: 500 }}>OPS</span>
+              </div>
+
+              {/* No Coverage Bar */}
+              <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: "0.5rem", height: `${barContainerHeight}px`, justifyContent: "flex-end" }}>
+                {stats.noCoverageHours > 0 && (
+                  <span style={{ fontSize: "0.85rem", color: "#f8fafc", fontWeight: 600, marginBottom: "0.25rem" }}>
+                    {stats.noCoverageHours.toFixed(1)}h
+                  </span>
+                )}
+                <div
+                  style={{
+                    width: "100%",
+                    height: `${noCoverageBarHeight}px`,
+                    backgroundColor: "#FFFFFF",
+                    borderRadius: "0.375rem 0.375rem 0 0",
+                    border: "2px solid rgba(255, 255, 255, 0.8)",
+                    transition: "height 0.5s ease",
+                    display: stats.noCoverageHours > 0 ? "block" : "none",
+                  }}
+                />
+                <span style={{ fontSize: "0.9rem", color: "#94a3b8", fontWeight: 500 }}>No Cov</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          {onOpenDetails && (
+            <button
+              type="button"
+              onClick={onOpenDetails}
+              style={{
+                padding: "0.5rem 1rem",
+                backgroundColor: "rgba(59, 130, 246, 0.15)",
+                border: "1px solid rgba(59, 130, 246, 0.45)",
+                borderRadius: "0.5rem",
+                color: "#3b82f6",
+                fontSize: "0.95rem",
+                fontWeight: 600,
+                cursor: "pointer",
+                transition: "all 0.2s ease",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = "rgba(59, 130, 246, 0.25)";
+                e.currentTarget.style.border = "1px solid rgba(59, 130, 246, 0.65)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = "rgba(59, 130, 246, 0.15)";
+                e.currentTarget.style.border = "1px solid rgba(59, 130, 246, 0.45)";
+              }}
+            >
+              More Detail
+            </button>
+          )}
+          <div style={{ marginLeft: "auto" }}>
+            <button
+              type="button"
+              onClick={onClose}
+              style={modalSecondaryButtonStyle}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.border = "1px solid rgba(148, 163, 184, 0.55)";
+                e.currentTarget.style.color = "#f8fafc";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.border = "1px solid rgba(148, 163, 184, 0.35)";
+                e.currentTarget.style.color = "#e2e8f0";
+              }}
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      </div>
+    </Modal>
+  );
+};
+
+/**
+ * Detailed Summary Modal Component
+ */
+const DetailedSummaryModal = ({ weekData, onClose }) => {
+  // Calculate hours from time string (e.g., "0800", "1600")
+  const timeToHours = (timeStr) => {
+    if (!timeStr || typeof timeStr !== 'string') return 0;
+    const upperTime = timeStr.toUpperCase();
+    // Skip xxxx times
+    if (upperTime === 'XXXX') return 0;
+    
+    // Parse time string (format: "HHMM" or "HH:MM")
+    const cleanTime = timeStr.replace(/[^0-9]/g, '');
+    if (cleanTime.length !== 4) return 0;
+    
+    const hours = parseInt(cleanTime.substring(0, 2), 10);
+    const minutes = parseInt(cleanTime.substring(2, 4), 10);
+    
+    return hours + (minutes / 60);
+  };
+
+  // Calculate shift hours
+  const calculateShiftHours = (startTime, endTime) => {
+    const start = timeToHours(startTime);
+    const end = timeToHours(endTime);
+    
+    if (start === 0 || end === 0) return 0;
+    
+    // Handle overnight shifts (end < start)
+    let hours = end - start;
+    if (hours < 0) {
+      hours = (24 - start) + end;
+    }
+    
+    return hours;
+  };
+
+  // Calculate top sites statistics
+  const siteStats = useMemo(() => {
+    const allShiftsBySite = {}; // All shifts by site (all colors) - total coverage needed
+    const opsShiftsBySite = {}; // OPS shifts by site (blue background only)
+
+    if (!weekData || !weekData.days) {
+      return { coverageNeeded: [], opsNeeded: [] };
+    }
+
+    weekData.days.forEach(day => {
+      if (!day.shifts || !Array.isArray(day.shifts)) return;
+
+      day.shifts.forEach(shift => {
+        const startTime = shift.startTime || '';
+        const endTime = shift.endTime || '';
+        const upperStart = startTime.toUpperCase();
+        const upperEnd = endTime.toUpperCase();
+
+        // Skip shifts with xxxx time
+        if (upperStart === 'XXXX' || upperEnd === 'XXXX') return;
+
+        const shiftHours = calculateShiftHours(startTime, endTime);
+        if (shiftHours <= 0) return;
+
+        const site = shift.site || 'Unknown';
+        const bgColor = shift.bgColor || '#FFFFFF';
+        
+        // Normalize bgColor - handle various formats
+        let normalizedBg = bgColor.toUpperCase().trim();
+        // Remove # if present for comparison
+        if (normalizedBg.startsWith('#')) {
+          normalizedBg = normalizedBg.substring(1);
+        }
+        
+        // Normalize OPS color for comparison
+        const opsBgNormalized = COLOR_OPS_BG.toUpperCase().trim();
+        let opsBgToCompare = opsBgNormalized.startsWith('#') ? opsBgNormalized.substring(1) : opsBgNormalized;
+        // Handle 8-digit hex codes - compare first 6 digits
+        if (opsBgToCompare.length === 8) {
+          opsBgToCompare = opsBgToCompare.substring(0, 6);
+        }
+        const normalizedBgFirst6 = normalizedBg.length >= 6 ? normalizedBg.substring(0, 6) : normalizedBg;
+        
+        // Check if it's OPS (blue background) - handle various formats
+        const isOps = normalizedBgFirst6 === opsBgToCompare || 
+                     normalizedBgFirst6 === '7DA6F1';
+
+        // Count all shifts (all colors) for total coverage needed
+        if (!allShiftsBySite[site]) {
+          allShiftsBySite[site] = 0;
+        }
+        allShiftsBySite[site] += shiftHours;
+
+        // Count OPS shifts (blue background only)
+        if (isOps) {
+          if (!opsShiftsBySite[site]) {
+            opsShiftsBySite[site] = 0;
+          }
+          opsShiftsBySite[site] += shiftHours;
+        }
+      });
+    });
+
+    // Convert to arrays and sort by hours (descending), then take top 10
+    const coverageNeededArray = Object.entries(allShiftsBySite)
+      .map(([site, hours]) => ({ site, hours }))
+      .sort((a, b) => b.hours - a.hours)
+      .slice(0, 10);
+
+    const opsNeededArray = Object.entries(opsShiftsBySite)
+      .map(([site, hours]) => ({ site, hours }))
+      .sort((a, b) => b.hours - a.hours)
+      .slice(0, 10);
+
+    return { coverageNeeded: coverageNeededArray, opsNeeded: opsNeededArray };
+  }, [weekData]);
+
+  return (
+    <Modal onClose={onClose}>
+      <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem", width: "100%", maxWidth: "80rem" }}>
+        <div>
+          <h3
+            style={{
+              fontSize: "1.5rem",
+              fontWeight: 700,
+              color: "#f8fafc",
+              marginBottom: "0.25rem",
+            }}
+          >
+            Detailed Coverage Analysis
+          </h3>
+          <p
+            style={{
+              fontSize: "1.0rem",
+              color: "#94a3b8",
+              margin: 0,
+            }}
+          >
+            Top sites requiring coverage attention
+          </p>
+        </div>
+
+        <div style={{ display: "flex", gap: "2rem", alignItems: "flex-start" }}>
+          {/* Left side: Top 10 sites with most coverage needed */}
+          <div
+            style={{
+              flex: 1,
+              backgroundColor: "rgba(15, 23, 42, 0.6)",
+              borderRadius: "0.75rem",
+              border: "1px solid rgba(148, 163, 184, 0.18)",
+              padding: "2rem",
+            }}
+          >
+            <h4
+              style={{
+                fontSize: "1.2rem",
+                fontWeight: 700,
+                color: "#f8fafc",
+                marginBottom: "1.5rem",
+              }}
+            >
+              Top 10 Demanding Sites 
+            </h4>
+            {siteStats.coverageNeeded.length > 0 ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                {siteStats.coverageNeeded.map((item, index) => (
+                  <div
+                    key={item.site}
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      padding: "0.75rem 1rem",
+                      backgroundColor: "rgba(0, 0, 0, 0.3)",
+                      borderRadius: "0.5rem",
+                      border: "1px solid rgba(148, 163, 184, 0.2)",
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                      <span
+                        style={{
+                          fontSize: "0.9rem",
+                          fontWeight: 600,
+                          color: "#94a3b8",
+                          minWidth: "1.5rem",
+                        }}
+                      >
+                        {index + 1}.
+                      </span>
+                      <span
+                        style={{
+                          fontSize: "1rem",
+                          fontWeight: 600,
+                          color: "#ffffff",
+                        }}
+                      >
+                        {item.site}
+                      </span>
+                    </div>
+                    <span
+                      style={{
+                        fontSize: "1rem",
+                        fontWeight: 700,
+                        color: "#ffffff",
+                      }}
+                    >
+                      {item.hours.toFixed(1)} hrs
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div
+                style={{
+                  padding: "2rem",
+                  textAlign: "center",
+                  color: "#94a3b8",
+                  fontSize: "1rem",
+                }}
+              >
+                No shifts found
+              </div>
+            )}
+          </div>
+
+          {/* Right side: Top sites where OPS needed */}
+          <div
+            style={{
+              flex: 1,
+              backgroundColor: "rgba(15, 23, 42, 0.6)",
+              borderRadius: "0.75rem",
+              border: "1px solid rgba(148, 163, 184, 0.18)",
+              padding: "2rem",
+            }}
+          >
+            <h4
+              style={{
+                fontSize: "1.2rem",
+                fontWeight: 700,
+                color: "#f8fafc",
+                marginBottom: "1.5rem",
+              }}
+            >
+              Top 10 OPS Covered Sites
+            </h4>
+            {siteStats.opsNeeded.length > 0 ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                {siteStats.opsNeeded.map((item, index) => {
+                  // Remove any "OPS" text from site name for display
+                  const displaySiteName = item.site.replace(/\s*OPS\s*/gi, '').trim();
+                  return (
+                    <div
+                      key={item.site}
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        padding: "0.75rem 1rem",
+                        backgroundColor: "rgba(59, 130, 246, 0.15)",
+                        borderRadius: "0.5rem",
+                        border: "1px solid rgba(59, 130, 246, 0.3)",
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                        <span
+                          style={{
+                            fontSize: "0.9rem",
+                            fontWeight: 600,
+                            color: "#94a3b8",
+                            minWidth: "1.5rem",
+                          }}
+                        >
+                          {index + 1}.
+                        </span>
+                        <span
+                          style={{
+                            fontSize: "1rem",
+                            fontWeight: 600,
+                            color: "#ffffff",
+                          }}
+                        >
+                          {displaySiteName}
+                        </span>
+                      </div>
+                      <span
+                        style={{
+                          fontSize: "1rem",
+                          fontWeight: 700,
+                          color: "#3b82f6",
+                        }}
+                      >
+                        {item.hours.toFixed(1)} hrs
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div
+                style={{
+                  padding: "2rem",
+                  textAlign: "center",
+                  color: "#94a3b8",
+                  fontSize: "1rem",
+                }}
+              >
+                No OPS shifts found
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div style={{ display: "flex", justifyContent: "flex-end" }}>
+          <button
+            type="button"
+            onClick={onClose}
+            style={modalSecondaryButtonStyle}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.border = "1px solid rgba(148, 163, 184, 0.55)";
+              e.currentTarget.style.color = "#f8fafc";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.border = "1px solid rgba(148, 163, 184, 0.35)";
+              e.currentTarget.style.color = "#e2e8f0";
+            }}
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+};
+
+/**
  * Registered Users Modal
  */
 const RegisteredUsersModal = ({ users, onClose, onDeleteUser, isAdmin }) => {
@@ -4673,6 +5315,27 @@ const App = () => {
       />
     );
   };
+
+  const openDetailedSummaryModal = () => {
+    openModal(
+      <DetailedSummaryModal
+        weekData={weekData}
+        onClose={closeModal}
+      />
+    );
+  };
+
+  const openSummaryModal = () => {
+    openModal(
+      <SummaryModal
+        weekData={weekData}
+        onClose={closeModal}
+        isAdmin={isAdmin}
+        weekId={weekId}
+        onOpenDetails={openDetailedSummaryModal}
+      />
+    );
+  };
   // New modal handler for Day Notes
   const openDayNotesModal = (day, notes) => {
     openModal(
@@ -5035,6 +5698,7 @@ const App = () => {
         onOpenAnalysis={handleOpenAnalysis}
         onOpenResearch={handleOpenResearch}
         onOpenSiteManager={handleOpenSiteManager}
+        onOpenSummary={openSummaryModal}
         showSettings={Boolean(userInfo?.isAdmin)}
         onOpenSettings={openRegisteredUsersModal}
         onLogout={handleLogout}
