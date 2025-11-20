@@ -16,6 +16,9 @@ import {
   collection,
   setLogLevel,
   getDocs,
+  addDoc,
+  updateDoc,
+  writeBatch,
 } from "firebase/firestore";
 import {
   getAuth,
@@ -167,6 +170,7 @@ const SITE_DIRECTORY_DOC_PATH = [
   "site-directory",
 ];
 const REGISTERED_USERS_COLLECTION = `/artifacts/${appId}/public/data/registered-users`;
+const SITES_COLLECTION_PATH = "public_sites"; // Shared collection for site directory
 
 const formatTimestamp = (isoString) => {
   if (!isoString) return "--";
@@ -312,6 +316,38 @@ const formatDateHeader = (date) => {
     .format(date)
     .replace(",", "")
     .toUpperCase();
+};
+
+/**
+ * Formats current time as military time (HH:MM).
+ */
+const formatMilitaryTime = (date) => {
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+  return `${hours}:${minutes}`;
+};
+
+/**
+ * Checks if a date is today (same year, month, and day).
+ */
+const isToday = (date) => {
+  const today = new Date();
+  const checkDate = new Date(date);
+  return (
+    checkDate.getFullYear() === today.getFullYear() &&
+    checkDate.getMonth() === today.getMonth() &&
+    checkDate.getDate() === today.getDate()
+  );
+};
+
+/**
+ * Strips parentheses and their contents from site name.
+ * Example: "600 Cal (N.Watson)" -> "600 Cal"
+ */
+const stripParentheses = (siteName) => {
+  if (!siteName || typeof siteName !== 'string') return siteName || '';
+  // Remove everything in parentheses including the parentheses
+  return siteName.replace(/\s*\([^)]*\)/g, '').trim();
 };
 
 /**
@@ -740,6 +776,149 @@ const Leaderboard = ({ weekData }) => {
 /**
  * Header Component
  */
+/**
+ * Site Search Input Component
+ */
+const SiteSearchInput = ({ onSelectSite, db }) => {
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sites, setSites] = useState([]);
+  const [filteredSites, setFilteredSites] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const searchRef = useRef(null);
+  const suggestionsRef = useClickOutside(() => {
+    setShowSuggestions(false);
+  });
+
+  // Load sites from Firebase
+  useEffect(() => {
+    if (!db) return;
+
+    const sitesCollectionRef = collection(db, SITES_COLLECTION_PATH);
+    
+    const unsubscribe = onSnapshot(sitesCollectionRef, (snapshot) => {
+      const sitesData = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+      setSites(sitesData);
+    }, (error) => {
+      console.error("Error listening to sites:", error);
+    });
+
+    return () => unsubscribe();
+  }, [db]);
+
+  // Filter sites based on search query
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      setFilteredSites([]);
+      setShowSuggestions(false);
+      return;
+    }
+
+    const query = searchQuery.toLowerCase();
+    const matches = sites.filter((site) =>
+      site.address?.toLowerCase().includes(query)
+    );
+    setFilteredSites(matches);
+    setShowSuggestions(matches.length > 0);
+  }, [searchQuery, sites]);
+
+  const handleSelectSite = (site) => {
+    setSearchQuery("");
+    setShowSuggestions(false);
+    onSelectSite(site);
+  };
+
+  return (
+    <div
+      ref={suggestionsRef}
+      style={{
+        position: "relative",
+        minWidth: "200px",
+        maxWidth: "400px",
+        flex: 1,
+      }}
+    >
+      <input
+        ref={searchRef}
+        type="text"
+        value={searchQuery}
+        onChange={(e) => setSearchQuery(e.target.value)}
+        onFocus={() => {
+          if (filteredSites.length > 0) {
+            setShowSuggestions(true);
+          }
+        }}
+        placeholder="Search site"
+        style={{
+          width: "100%",
+          padding: "0.45rem 0.9rem",
+          borderRadius: "9999px",
+          border: "1px solid rgba(148, 163, 184, 0.45)",
+          backgroundColor: "rgba(15, 23, 42, 0.65)",
+          color: "#e2e8f0",
+          fontSize: "1.02rem",
+          letterSpacing: "0.05em",
+          textTransform: "uppercase",
+          fontWeight: 600,
+          fontFamily: "monospace",
+          transition: "border 0.15s ease, color 0.15s ease",
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.border = "1px solid rgba(139, 92, 246, 0.75)";
+          e.currentTarget.style.color = "#c4b5fd";
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.border = "1px solid rgba(148, 163, 184, 0.45)";
+          e.currentTarget.style.color = "#e2e8f0";
+        }}
+      />
+      {showSuggestions && filteredSites.length > 0 && (
+        <div
+          style={{
+            position: "absolute",
+            top: "100%",
+            left: 0,
+            right: 0,
+            marginTop: "0.25rem",
+            backgroundColor: "rgba(15, 23, 42, 0.95)",
+            border: "1px solid rgba(148, 163, 184, 0.35)",
+            borderRadius: "0.5rem",
+            maxHeight: "300px",
+            overflowY: "auto",
+            zIndex: 50,
+            boxShadow: "0 10px 25px rgba(0, 0, 0, 0.5)",
+          }}
+        >
+          {filteredSites.map((site) => (
+            <div
+              key={site.id}
+              onClick={() => handleSelectSite(site)}
+              style={{
+                padding: "0.75rem 1rem",
+                cursor: "pointer",
+                borderBottom: "1px solid rgba(148, 163, 184, 0.15)",
+                color: "#e2e8f0",
+                fontSize: "0.95rem",
+                transition: "background-color 0.2s ease",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = "rgba(59, 130, 246, 0.18)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = "transparent";
+              }}
+            >
+              {site.address}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const Header = ({
   onPrevWeek,
   onNextWeek,
@@ -748,6 +927,7 @@ const Header = ({
   onSignUp,
   userInfo,
   hasAccess,
+  onOpenSearch,
   onOpenAnalysis,
   onOpenResearch,
   onOpenSiteManager,
@@ -756,6 +936,7 @@ const Header = ({
   onOpenSettings,
   onLogout,
   weekData,
+  db,
 }) => {
   const isAdmin = Boolean(userInfo?.isAdmin);
   const [isAvatarMenuOpen, setIsAvatarMenuOpen] = useState(false);
@@ -858,6 +1039,10 @@ const Header = ({
           gap: "0.75rem",
         }}
       >
+        <SiteSearchInput
+          onSelectSite={onOpenSearch}
+          db={db}
+        />
         <button
           className="micro-pressable micro-pill"
           type="button"
@@ -1325,6 +1510,21 @@ const DayColumn = ({
   syncScrollRef,
   topUserInitials,
 }) => {
+  const [currentTime, setCurrentTime] = useState(new Date());
+  const dayDate = day.date instanceof Date ? day.date : new Date(day.date);
+  const isCurrentDay = isToday(dayDate);
+
+  // Update time every second if it's the current day
+  useEffect(() => {
+    if (!isCurrentDay) return;
+
+    const interval = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000); // Update every second
+
+    return () => clearInterval(interval);
+  }, [isCurrentDay]);
+
   const sortedShifts = useMemo(() => {
     return [...shifts].sort((a, b) => {
       const timeA = a.startTime || "0000";
@@ -1374,12 +1574,28 @@ const DayColumn = ({
           className="font-bold text-white text-sm uppercase"
           style={{
             fontWeight: "bold",
-            color: "#ffffff",
+            color: isCurrentDay ? "#22c55e" : "#ffffff",
             fontSize: "0.98rem",
             textTransform: "uppercase",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "0.5rem",
           }}
         >
-          {formatDateHeader(day.date)}
+          <span>{formatDateHeader(dayDate)}</span>
+          {isCurrentDay && (
+            <span
+              style={{
+                fontSize: "0.9rem",
+                fontWeight: 600,
+                color: "#22c55e",
+                fontFamily: "monospace",
+              }}
+            >
+              {formatMilitaryTime(currentTime)}
+            </span>
+          )}
         </div>
       </div>
       <div 
@@ -3784,7 +4000,7 @@ const DayNotesModal = ({
 /**
  * Summary Modal Component
  */
-const SummaryModal = ({ weekData, onClose, isAdmin, weekId, onOpenDetails }) => {
+const SummaryModal = ({ weekData, onClose, isAdmin, weekId, onOpenDetails, onOpenManagerData }) => {
   // Calculate hours from time string (e.g., "0800", "1600")
   const timeToHours = (timeStr) => {
     if (!timeStr || typeof timeStr !== 'string') return null;
@@ -4037,34 +4253,63 @@ const SummaryModal = ({ weekData, onClose, isAdmin, weekId, onOpenDetails }) => 
           </div>
         </div>
 
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          {onOpenDetails && (
-            <button
-              type="button"
-              onClick={onOpenDetails}
-              style={{
-                padding: "0.5rem 1rem",
-                backgroundColor: "rgba(59, 130, 246, 0.15)",
-                border: "1px solid rgba(59, 130, 246, 0.45)",
-                borderRadius: "0.5rem",
-                color: "#3b82f6",
-                fontSize: "0.95rem",
-                fontWeight: 600,
-                cursor: "pointer",
-                transition: "all 0.2s ease",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = "rgba(59, 130, 246, 0.25)";
-                e.currentTarget.style.border = "1px solid rgba(59, 130, 246, 0.65)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = "rgba(59, 130, 246, 0.15)";
-                e.currentTarget.style.border = "1px solid rgba(59, 130, 246, 0.45)";
-              }}
-            >
-              More Detail
-            </button>
-          )}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "0.75rem" }}>
+          <div style={{ display: "flex", gap: "0.75rem" }}>
+            {onOpenDetails && (
+              <button
+                type="button"
+                onClick={onOpenDetails}
+                style={{
+                  padding: "0.5rem 1rem",
+                  backgroundColor: "rgba(59, 130, 246, 0.15)",
+                  border: "1px solid rgba(59, 130, 246, 0.45)",
+                  borderRadius: "0.5rem",
+                  color: "#3b82f6",
+                  fontSize: "0.95rem",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  transition: "all 0.2s ease",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = "rgba(59, 130, 246, 0.25)";
+                  e.currentTarget.style.border = "1px solid rgba(59, 130, 246, 0.65)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = "rgba(59, 130, 246, 0.15)";
+                  e.currentTarget.style.border = "1px solid rgba(59, 130, 246, 0.45)";
+                }}
+              >
+                More Detail
+              </button>
+            )}
+            {onOpenManagerData && (
+              <button
+                type="button"
+                onClick={onOpenManagerData}
+                style={{
+                  padding: "0.5rem 1rem",
+                  backgroundColor: "rgba(139, 92, 246, 0.15)",
+                  border: "1px solid rgba(139, 92, 246, 0.45)",
+                  borderRadius: "0.5rem",
+                  color: "#a78bfa",
+                  fontSize: "0.95rem",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  transition: "all 0.2s ease",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = "rgba(139, 92, 246, 0.25)";
+                  e.currentTarget.style.border = "1px solid rgba(139, 92, 246, 0.65)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = "rgba(139, 92, 246, 0.15)";
+                  e.currentTarget.style.border = "1px solid rgba(139, 92, 246, 0.45)";
+                }}
+              >
+                Manager Data
+              </button>
+            )}
+          </div>
           <div style={{ marginLeft: "auto" }}>
             <button
               type="button"
@@ -4166,7 +4411,8 @@ const DetailedSummaryModal = ({ weekData, onClose }) => {
         const shiftHours = calculateShiftHours(startTime, endTime);
         if (shiftHours <= 0) return;
 
-        const site = shift.site || 'Unknown';
+        // Strip parentheses from site name for grouping (e.g., "600 Cal (N.Watson)" -> "600 Cal")
+        const site = stripParentheses(shift.site || 'Unknown');
         const bgColor = shift.bgColor || '#FFFFFF';
         
         // Normalize bgColor - handle various formats
@@ -4298,7 +4544,7 @@ const DetailedSummaryModal = ({ weekData, onClose }) => {
                           color: "#ffffff",
                         }}
                       >
-                        {item.site}
+                        {stripParentheses(item.site)}
                       </span>
                     </div>
                     <span
@@ -4350,8 +4596,8 @@ const DetailedSummaryModal = ({ weekData, onClose }) => {
             {siteStats.opsNeeded.length > 0 ? (
               <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
                 {siteStats.opsNeeded.map((item, index) => {
-                  // Remove any "OPS" text from site name for display
-                  const displaySiteName = item.site.replace(/\s*OPS\s*/gi, '').trim();
+                  // Remove any "OPS" text and parentheses from site name for display
+                  const displaySiteName = stripParentheses(item.site).replace(/\s*OPS\s*/gi, '').trim();
                   return (
                     <div
                       key={item.site}
@@ -4432,6 +4678,1173 @@ const DetailedSummaryModal = ({ weekData, onClose }) => {
           </button>
         </div>
       </div>
+    </Modal>
+  );
+};
+
+/**
+ * Manager Data Modal Component
+ */
+const ManagerDataModal = ({ weekData, onClose, db }) => {
+  const [sites, setSites] = useState([]);
+
+  // Load sites from Firebase
+  useEffect(() => {
+    if (!db) return;
+
+    const sitesCollectionRef = collection(db, SITES_COLLECTION_PATH);
+    
+    const unsubscribe = onSnapshot(sitesCollectionRef, (snapshot) => {
+      const sitesData = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+      setSites(sitesData);
+    }, (error) => {
+      console.error("Error listening to sites:", error);
+    });
+
+    return () => unsubscribe();
+  }, [db]);
+
+  // Helper to normalize site name for matching (removes @ prefix and normalizes)
+  const normalizeSiteName = (siteName) => {
+    if (!siteName) return '';
+    // Remove @ prefix
+    let normalized = siteName.replace(/^@\s*/, '').trim();
+    // Normalize to uppercase for comparison
+    return normalized.toUpperCase();
+  };
+
+  // Helper to match shift site to site directory site
+  const findSiteMatch = (shiftSiteName) => {
+    const normalizedShift = normalizeSiteName(shiftSiteName);
+    
+    // Try exact match first (after normalization)
+    let match = sites.find(site => {
+      const normalizedAddress = (site.address || '').toUpperCase();
+      return normalizedAddress === normalizedShift;
+    });
+
+    // Try partial match (shift site contains site address or vice versa)
+    if (!match) {
+      match = sites.find(site => {
+        const normalizedAddress = (site.address || '').toUpperCase();
+        // Check if shift site contains address or address contains shift site
+        return normalizedAddress.includes(normalizedShift) || 
+               normalizedShift.includes(normalizedAddress) ||
+               // Also try matching without common suffixes
+               normalizedAddress.replace(/\s+(ST|AVE|BLVD|STREET|AVENUE|BOULEVARD)$/i, '') === normalizedShift.replace(/\s+(ST|AVE|BLVD|STREET|AVENUE|BOULEVARD)$/i, '');
+      });
+    }
+
+    return match;
+  };
+
+  // Calculate hours from time string
+  const timeToHours = (timeStr) => {
+    if (!timeStr || typeof timeStr !== 'string') return null;
+    const upperTime = timeStr.toUpperCase();
+    if (upperTime === 'XXXX') return null;
+    
+    const cleanTime = timeStr.replace(/[^0-9]/g, '');
+    if (cleanTime.length !== 4) return null;
+    
+    const hours = parseInt(cleanTime.substring(0, 2), 10);
+    const minutes = parseInt(cleanTime.substring(2, 4), 10);
+    
+    if (hours === 0 && minutes === 0) {
+      return 24.0;
+    }
+    
+    return hours + (minutes / 60);
+  };
+
+  // Calculate shift hours
+  const calculateShiftHours = (startTime, endTime) => {
+    const start = timeToHours(startTime);
+    const end = timeToHours(endTime);
+    
+    if (start === null || end === null) return 0;
+    
+    if (start === 24.0 && end === 24.0) {
+      return 24.0;
+    }
+    
+    let hours = end - start;
+    if (hours < 0) {
+      hours = (24 - start) + end;
+    } else if (end === 24.0 && start < 24) {
+      hours = 24 - start;
+    }
+    
+    return hours;
+  };
+
+  // Calculate manager statistics
+  const managerStats = useMemo(() => {
+    const managerHours = {}; // { managerName: { totalHours: 0, opsHours: 0 } }
+
+    if (!weekData || !weekData.days || !sites.length) {
+      return [];
+    }
+
+    weekData.days.forEach(day => {
+      if (!day.shifts || !Array.isArray(day.shifts)) return;
+
+      day.shifts.forEach(shift => {
+        const startTime = shift.startTime || '';
+        const endTime = shift.endTime || '';
+        const upperStart = startTime.toUpperCase();
+        const upperEnd = endTime.toUpperCase();
+
+        // Skip shifts with xxxx time
+        if (upperStart === 'XXXX' || upperEnd === 'XXXX') return;
+
+        const shiftHours = calculateShiftHours(startTime, endTime);
+        if (shiftHours <= 0) return;
+
+        // Strip parentheses from site name for matching (e.g., "600 Cal (N.Watson)" -> "600 Cal")
+        const shiftSite = stripParentheses(shift.site || '');
+        
+        // Find matching site in directory
+        const matchedSite = findSiteMatch(shiftSite);
+        
+        if (!matchedSite || !matchedSite.manager) {
+          // If no match found, skip this shift
+          return;
+        }
+
+        const managerName = matchedSite.manager;
+        
+        // Initialize manager if not exists
+        if (!managerHours[managerName]) {
+          managerHours[managerName] = { totalHours: 0, opsHours: 0 };
+        }
+
+        // Add to total hours
+        managerHours[managerName].totalHours += shiftHours;
+
+        // Check if OPS (blue background)
+        const bgColor = shift.bgColor || '#FFFFFF';
+        let normalizedBg = bgColor.toUpperCase().trim();
+        if (normalizedBg.startsWith('#')) {
+          normalizedBg = normalizedBg.substring(1);
+        }
+        
+        const opsBgNormalized = COLOR_OPS_BG.toUpperCase().trim();
+        let opsBgToCompare = opsBgNormalized.startsWith('#') ? opsBgNormalized.substring(1) : opsBgNormalized;
+        if (opsBgToCompare.length === 8) {
+          opsBgToCompare = opsBgToCompare.substring(0, 6);
+        }
+        const normalizedBgFirst6 = normalizedBg.length >= 6 ? normalizedBg.substring(0, 6) : normalizedBg;
+        
+        const isOps = normalizedBgFirst6 === opsBgToCompare || normalizedBgFirst6 === '7DA6F1';
+
+        if (isOps) {
+          managerHours[managerName].opsHours += shiftHours;
+        }
+      });
+    });
+
+    // Convert to array and sort by total hours (descending)
+    return Object.entries(managerHours)
+      .map(([manager, stats]) => ({
+        manager,
+        totalHours: stats.totalHours,
+        opsHours: stats.opsHours,
+      }))
+      .sort((a, b) => b.totalHours - a.totalHours);
+  }, [weekData, sites]);
+
+  // Calculate max hours for scaling
+  const maxHours = useMemo(() => {
+    if (managerStats.length === 0) return 1;
+    return Math.max(
+      ...managerStats.map(m => Math.max(m.totalHours, m.opsHours)),
+      1
+    );
+  }, [managerStats]);
+
+  const barContainerHeight = 150; // Fixed height for bars
+
+  return (
+    <Modal onClose={onClose}>
+      <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem", width: "100%", maxWidth: "80rem" }}>
+        <div>
+          <h3
+            style={{
+              fontSize: "1.5rem",
+              fontWeight: 700,
+              color: "#f8fafc",
+              marginBottom: "0.25rem",
+            }}
+          >
+            CSM Coverage Data
+          </h3>
+          <p
+            style={{
+              fontSize: "1.0rem",
+              color: "#94a3b8",
+              margin: 0,
+            }}
+          >
+          
+          </p>
+        </div>
+
+        {managerStats.length > 0 ? (
+          <div
+            style={{
+              backgroundColor: "rgba(15, 23, 42, 0.6)",
+              borderRadius: "0.75rem",
+              border: "1px solid rgba(148, 163, 184, 0.18)",
+              padding: "1.5rem",
+              overflowX: "auto",
+            }}
+          >
+            <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+              {managerStats.map((item, index) => {
+                // Calculate bar heights based on maxHours
+                const totalBarHeight = maxHours > 0 && item.totalHours > 0 
+                  ? (item.totalHours / maxHours) * barContainerHeight 
+                  : 0;
+                const opsBarHeight = maxHours > 0 && item.opsHours > 0 
+                  ? (item.opsHours / maxHours) * barContainerHeight 
+                  : 0;
+
+                return (
+                  <div
+                    key={item.manager}
+                    style={{
+                      display: "flex",
+                      gap: "2rem",
+                      padding: "0.75rem 1rem",
+                      backgroundColor: index % 2 === 0 ? "rgba(0, 0, 0, 0.3)" : "rgba(0, 0, 0, 0.1)",
+                      borderRadius: "0.5rem",
+                      border: "1px solid rgba(148, 163, 184, 0.1)",
+                      minHeight: `${barContainerHeight + 80}px`,
+                      alignItems: "flex-start",
+                    }}
+                  >
+                    {/* Left Side: Data */}
+                    <div style={{ 
+                      flex: "0 0 250px",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "0.5rem",
+                    }}>
+                      <div style={{ 
+                        fontSize: "1rem", 
+                        fontWeight: 600, 
+                        color: "#f8fafc",
+                        marginBottom: "0.5rem",
+                      }}>
+                        {item.manager}
+                      </div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                        {item.totalHours > 0 && (
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                            <span style={{ fontSize: "0.9rem", color: "#94a3b8" }}>Total Coverage:</span>
+                            <span style={{ fontSize: "0.9rem", fontWeight: 700, color: "#22c55e" }}>
+                              {item.totalHours.toFixed(1)} hrs
+                            </span>
+                          </div>
+                        )}
+                        {item.opsHours > 0 && (
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                            <span style={{ fontSize: "0.9rem", color: "#94a3b8" }}>OPS Coverage:</span>
+                            <span style={{ fontSize: "0.9rem", fontWeight: 700, color: "#3b82f6" }}>
+                              {item.opsHours.toFixed(1)} hrs
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Right Side: Bar Charts */}
+                    <div style={{ 
+                      flex: 1,
+                      display: "flex", 
+                      gap: "2rem", 
+                      alignItems: "flex-end", 
+                      minHeight: `${barContainerHeight + 60}px`,
+                      justifyContent: "flex-start",
+                    }}>
+                      {/* Total Coverage Bar */}
+                      <div style={{ 
+                        display: "flex", 
+                        flexDirection: "column", 
+                        alignItems: "center", 
+                        justifyContent: "flex-end",
+                        minWidth: "80px",
+                        height: `${barContainerHeight + 50}px`,
+                      }}>
+                        <div style={{
+                          width: "100%",
+                          height: `${barContainerHeight}px`,
+                          display: "flex",
+                          flexDirection: "column",
+                          justifyContent: "flex-end",
+                          position: "relative",
+                        }}>
+                          <div
+                            style={{
+                              width: "100%",
+                              height: `${totalBarHeight}px`,
+                              backgroundColor: "#22c55e",
+                              borderRadius: "0.375rem 0.375rem 0 0",
+                              border: "2px solid rgba(34, 197, 94, 0.6)",
+                              transition: "height 0.5s ease",
+                              display: item.totalHours > 0 ? "block" : "none",
+                            }}
+                          />
+                        </div>
+                        <span style={{ 
+                          fontSize: "0.85rem", 
+                          color: "#94a3b8", 
+                          fontWeight: 500,
+                          marginTop: "0.5rem",
+                          height: "1.2rem",
+                          display: "flex",
+                          alignItems: "center",
+                        }}>
+                          Total
+                        </span>
+                      </div>
+
+                      {/* OPS Coverage Bar */}
+                      <div style={{ 
+                        display: "flex", 
+                        flexDirection: "column", 
+                        alignItems: "center", 
+                        justifyContent: "flex-end",
+                        minWidth: "80px",
+                        height: `${barContainerHeight + 50}px`,
+                      }}>
+                        <div style={{
+                          width: "100%",
+                          height: `${barContainerHeight}px`,
+                          display: "flex",
+                          flexDirection: "column",
+                          justifyContent: "flex-end",
+                          position: "relative",
+                        }}>
+                          <div
+                            style={{
+                              width: "100%",
+                              height: `${opsBarHeight}px`,
+                              backgroundColor: "#3b82f6",
+                              borderRadius: "0.375rem 0.375rem 0 0",
+                              border: "2px solid rgba(59, 130, 246, 0.6)",
+                              transition: "height 0.5s ease",
+                              display: item.opsHours > 0 ? "block" : "none",
+                            }}
+                          />
+                        </div>
+                        <span style={{ 
+                          fontSize: "0.85rem", 
+                          color: "#94a3b8", 
+                          fontWeight: 500,
+                          marginTop: "0.5rem",
+                          height: "1.2rem",
+                          display: "flex",
+                          alignItems: "center",
+                        }}>
+                          OPS
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ) : (
+          <div
+            style={{
+              padding: "3rem",
+              textAlign: "center",
+              color: "#94a3b8",
+              fontSize: "1rem",
+              backgroundColor: "rgba(15, 23, 42, 0.6)",
+              borderRadius: "0.75rem",
+              border: "1px solid rgba(148, 163, 184, 0.18)",
+            }}
+          >
+            {sites.length === 0 ? "Loading site data..." : "No manager data available for this week"}
+          </div>
+        )}
+
+        <div style={{ display: "flex", justifyContent: "flex-end" }}>
+          <button
+            type="button"
+            onClick={onClose}
+            style={{
+              padding: "0.6rem 1.2rem",
+              backgroundColor: "transparent",
+              border: "1px solid rgba(148, 163, 184, 0.35)",
+              color: "#e2e8f0",
+              borderRadius: "0.5rem",
+              fontWeight: 600,
+              cursor: "pointer",
+              fontSize: "0.95rem",
+              transition: "all 0.2s ease",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.border = "1px solid rgba(148, 163, 184, 0.55)";
+              e.currentTarget.style.color = "#f8fafc";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.border = "1px solid rgba(148, 163, 184, 0.35)";
+              e.currentTarget.style.color = "#e2e8f0";
+            }}
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+};
+
+/**
+ * Site Search Modal Component
+ */
+const SiteSearchModal = ({ onClose, hasAccess, db, initialSelectedSite = null }) => {
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sites, setSites] = useState([]);
+  const [filteredSites, setFilteredSites] = useState([]);
+  const [selectedSite, setSelectedSite] = useState(initialSelectedSite);
+
+  // Set selected site when initialSelectedSite changes (before sites are loaded)
+  useEffect(() => {
+    if (initialSelectedSite && !selectedSite) {
+      setSelectedSite(initialSelectedSite);
+    }
+  }, [initialSelectedSite]);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [editingSite, setEditingSite] = useState(null);
+  const [formData, setFormData] = useState({
+    address: "",
+    manager: "",
+    uniform: {
+      blazer: "",
+      pant: "",
+      shirt: "",
+      tie: "",
+    },
+  });
+
+  // Load sites from Firebase
+  useEffect(() => {
+    if (!db) return;
+
+    const sitesCollectionRef = collection(db, SITES_COLLECTION_PATH);
+    
+    const unsubscribe = onSnapshot(sitesCollectionRef, (snapshot) => {
+      const sitesData = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+      setSites(sitesData);
+      
+      // Seed database if empty
+      if (sitesData.length === 0) {
+        seedDatabase();
+      }
+    }, (error) => {
+      console.error("Error listening to sites:", error);
+    });
+
+    return () => unsubscribe();
+  }, [db]);
+
+  // Seed database with default sites
+  const seedDatabase = async () => {
+    if (!db) return;
+
+    const defaultSites = [
+      { manager: "Doug Fletcher", address: "736 Mission St", uniform: { blazer: "Black", pant: "Black", shirt: "White", tie: "Black" } },
+      { manager: "Doug Fletcher", address: "600 California St", uniform: { blazer: "Black", pant: "Black", shirt: "White", tie: "Black" } },
+      { manager: "Doug Fletcher", address: "120 Kearny St", uniform: { blazer: "Black", pant: "Black", shirt: "White", tie: "Black" } },
+      { manager: "Jason Daugherty", address: "1128 Market St", uniform: { blazer: "Black", pant: "Black", shirt: "White", tie: "Black" } },
+      { manager: "Jason Daugherty", address: "420 23rd St", uniform: { blazer: "Green Jacket", pant: "Cargo (Blk)", shirt: "Polo (Blk)", tie: "---" } },
+      { manager: "Jason Daugherty", address: "1 La Avanzada St", uniform: { blazer: "Black", pant: "Black", shirt: "White", tie: "Black" } },
+      { manager: "Jason Daugherty", address: "500 Howard St", uniform: { blazer: "Black", pant: "Black", shirt: "White", tie: "Black" } },
+      { manager: "Jason Daugherty", address: "500 Pine St", uniform: { blazer: "Black", pant: "Black", shirt: "White", tie: "Black" } },
+      { manager: "Jason Daugherty", address: "1800 Mission St", uniform: { blazer: "Black", pant: "Black", shirt: "White", tie: "Black" } },
+      { manager: "Jason Daugherty", address: "130 Battery St", uniform: { blazer: "Black", pant: "Black", shirt: "White", tie: "Black" } },
+      { manager: "Jason Daugherty", address: "1400 Geary Blvd", uniform: { blazer: "Black", pant: "Black", shirt: "White", tie: "Black" } },
+      { manager: "Jason Daugherty", address: "300 Kansas St", uniform: { blazer: "Black", pant: "Black", shirt: "White", tie: "Black" } },
+      { manager: "Jason Daugherty", address: "633 Folsom St", uniform: { blazer: "Black", pant: "Black", shirt: "White", tie: "Black" } },
+      { manager: "Jason Daugherty", address: "501 2nd St", uniform: { blazer: "Black", pant: "Black", shirt: "White", tie: "Black" } },
+      { manager: "Jason Daugherty", address: "111 Pine St", uniform: { blazer: "Black", pant: "Black", shirt: "White", tie: "Black" } },
+      { manager: "Jason Daugherty", address: "400 Paul Ave", uniform: { blazer: "Black", pant: "Black", shirt: "White", tie: "Black" } },
+      { manager: "Jason Daugherty", address: "1 Kearny St", uniform: { blazer: "Black", pant: "Black", shirt: "White", tie: "Black" } },
+      { manager: "Jason Daugherty", address: "1200 Van Ness Ave", uniform: { blazer: "Black", pant: "Black", shirt: "White", tie: "Black" } },
+      { manager: "Aldo Diaz", address: "181 Fremont St", uniform: { blazer: "Black", pant: "Black", shirt: "White", tie: "Gray" } },
+      { manager: "Aldo Diaz", address: "274 Brannan St", uniform: { blazer: "Black", pant: "Black", shirt: "White", tie: "Gray" } },
+      { manager: "Aldo Diaz", address: "360 Spear St", uniform: { blazer: "Black", pant: "Black", shirt: "White", tie: "Gray" } },
+      { manager: "Aldo Diaz", address: "1035 Market St", uniform: { blazer: "Black", pant: "Black", shirt: "White", tie: "Black" } },
+      { manager: "Aldo Diaz", address: "150 Spear St", uniform: { blazer: "Black", pant: "Black", shirt: "White", tie: "Black" } },
+      { manager: "Aldo Diaz", address: "750 Battery St", uniform: { blazer: "Black", pant: "Black", shirt: "White", tie: "Black" } },
+      { manager: "Aldo Diaz", address: "1635 Divisadero St", uniform: { blazer: "Black", pant: "Black", shirt: "White", tie: "Black" } },
+      { manager: "Aldo Diaz", address: "115 Sansome St", uniform: { blazer: "Black", pant: "Black", shirt: "White", tie: "Black" } },
+      { manager: "Aldo Diaz", address: "180 Montgomery St", uniform: { blazer: "Black", pant: "Black", shirt: "White", tie: "Black" } },
+      { manager: "Aldo Diaz", address: "220 Montgomery St", uniform: { blazer: "Black", pant: "Black", shirt: "White", tie: "Black" } },
+      { manager: "Aldo Diaz", address: "601 California St", uniform: { blazer: "Black", pant: "Black", shirt: "White", tie: "Black" } },
+      { manager: "Aldo Diaz", address: "711 Eddy St", uniform: { blazer: "Black", pant: "Black", shirt: "White", tie: "Black" } },
+      { manager: "Aldo Diaz", address: "1280 Laguna St", uniform: { blazer: "Black", pant: "Black", shirt: "White", tie: "Black" } },
+      { manager: "Aldo Diaz", address: "71 Stevenson St", uniform: { blazer: "Black", pant: "Black", shirt: "White", tie: "Black" } },
+      { manager: "Mohamed Ezzat", address: "240 Stockton St", uniform: { blazer: "Black", pant: "Black", shirt: "White", tie: "Black" } },
+      { manager: "Mohamed Ezzat", address: "30 Grant Ave", uniform: { blazer: "Black", pant: "Black", shirt: "White", tie: "Black" } },
+      { manager: "Mohamed Ezzat", address: "170 Maiden Lane", uniform: { blazer: "Black", pant: "Black", shirt: "White", tie: "Black" } },
+      { manager: "Mohamed Ezzat", address: "599 Skyline Blvd", uniform: { blazer: "Black", pant: "Black", shirt: "White", tie: "Black" } },
+      { manager: "Mohamed Ezzat", address: "456 Montgomery St", uniform: { blazer: "Black", pant: "Black", shirt: "White", tie: "Black" } },
+      { manager: "Mohamed Ezzat", address: "717 Market St", uniform: { blazer: "Black", pant: "Black", shirt: "White", tie: "Black" } },
+      { manager: "Mohamed Ezzat", address: "201 Mission St", uniform: { blazer: "Black", pant: "Black", shirt: "White", tie: "Black" } },
+      { manager: "Mohamed Ezzat", address: "101 Mission St", uniform: { blazer: "Black", pant: "Black", shirt: "White", tie: "Black" } },
+      { manager: "Mohamed Ezzat", address: "100 Montgomery St", uniform: { blazer: "Black", pant: "Black", shirt: "White", tie: "Black" } },
+      { manager: "Mohamed Ezzat", address: "166 Geary St", uniform: { blazer: "Black", pant: "Black", shirt: "White", tie: "Black" } },
+      { manager: "Inderprit Gill", address: "26 O'Farrell St", uniform: { blazer: "Black", pant: "Black", shirt: "White", tie: "Black" } },
+      { manager: "Inderprit Gill", address: "153 Kearny St", uniform: { blazer: "Black", pant: "Black", shirt: "White", tie: "Black" } },
+      { manager: "Inderprit Gill", address: "110 Sutter St", uniform: { blazer: "Black", pant: "Black", shirt: "White", tie: "Black" } },
+      { manager: "Inderprit Gill", address: "311 California St", uniform: { blazer: "Black", pant: "Black", shirt: "White", tie: "Black" } },
+      { manager: "Inderprit Gill", address: "90 New Montgomery St", uniform: { blazer: "Black", pant: "Black", shirt: "White", tie: "Black" } },
+      { manager: "Inderprit Gill", address: "785 Market St", uniform: { blazer: "Black", pant: "Black", shirt: "White", tie: "Black" } },
+      { manager: "Inderprit Gill", address: "230 California St", uniform: { blazer: "Black", pant: "Black", shirt: "White", tie: "Black" } },
+      { manager: "Inderprit Gill", address: "101 Montgomery St", uniform: { blazer: "Black", pant: "Black", shirt: "White", tie: "Black" } },
+      { manager: "Inderprit Gill", address: "425 California St", uniform: { blazer: "Black", pant: "Black", shirt: "White", tie: "Black" } },
+      { manager: "Inderprit Gill", address: "210 Post St", uniform: { blazer: "Black", pant: "Black", shirt: "White", tie: "Black" } },
+      { manager: "Inderprit Gill", address: "30 Maiden Lane", uniform: { blazer: "Black", pant: "Black", shirt: "White", tie: "Black" } },
+      { manager: "Inderprit Gill", address: "222 Kearny St", uniform: { blazer: "Black", pant: "Black", shirt: "White", tie: "Black" } },
+      { manager: "Inderprit Gill", address: "150 Post St", uniform: { blazer: "Black", pant: "Black", shirt: "White", tie: "Black" } },
+      { manager: "Inderprit Gill", address: "1019 Market St", uniform: { blazer: "Black", pant: "Black", shirt: "White", tie: "Black" } },
+      { manager: "Inderprit Gill", address: "425 Market St", uniform: { blazer: "Black", pant: "Black", shirt: "White", tie: "Black" } },
+    ];
+
+    try {
+      const sitesCollectionRef = collection(db, SITES_COLLECTION_PATH);
+      const batch = writeBatch(db);
+
+      defaultSites.forEach((site) => {
+        const docRef = doc(sitesCollectionRef);
+        batch.set(docRef, site);
+      });
+
+      await batch.commit();
+      console.log("Database seeded with default sites");
+    } catch (error) {
+      console.error("Error seeding database:", error);
+    }
+  };
+
+  // When sites are loaded, match initialSelectedSite with loaded sites to get full data
+  useEffect(() => {
+    if (initialSelectedSite && sites.length > 0 && selectedSite === initialSelectedSite) {
+      // Find the matching site in the loaded sites by id or address
+      const matchedSite = sites.find(
+        (site) => site.id === initialSelectedSite.id || 
+        site.address === initialSelectedSite.address
+      );
+      if (matchedSite && matchedSite.id !== selectedSite?.id) {
+        setSelectedSite(matchedSite);
+      }
+    }
+  }, [sites, initialSelectedSite, selectedSite]);
+
+  // Filter sites based on search query
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      setFilteredSites([]);
+      // Don't clear selectedSite - keep it if it exists
+      return;
+    }
+
+    const query = searchQuery.toLowerCase();
+    const matches = sites.filter((site) =>
+      site.address?.toLowerCase().includes(query)
+    );
+    setFilteredSites(matches);
+  }, [searchQuery, sites]);
+
+  const handleSelectSite = (site) => {
+    setSelectedSite(site);
+    setSearchQuery("");
+    setFilteredSites([]);
+  };
+
+  const handleEdit = (site) => {
+    setEditingSite(site);
+    setFormData({
+      address: site.address || "",
+      manager: site.manager || "",
+      uniform: {
+        blazer: site.uniform?.blazer || "",
+        pant: site.uniform?.pant || "",
+        shirt: site.uniform?.shirt || "",
+        tie: site.uniform?.tie || "",
+      },
+    });
+    setShowEditModal(true);
+  };
+
+  const handleCreateNew = () => {
+    setEditingSite(null);
+    setFormData({
+      address: "",
+      manager: "",
+      uniform: {
+        blazer: "",
+        pant: "",
+        shirt: "",
+        tie: "",
+      },
+    });
+    setShowEditModal(true);
+  };
+
+  const handleSave = async () => {
+    if (!formData.address || !formData.manager || !db) {
+      alert("Address and Manager are required.");
+      return;
+    }
+
+    try {
+      const sitesCollectionRef = collection(db, SITES_COLLECTION_PATH);
+      
+      if (editingSite) {
+        // Update existing site
+        const docRef = doc(db, SITES_COLLECTION_PATH, editingSite.id);
+        await updateDoc(docRef, formData);
+      } else {
+        // Create new site
+        await addDoc(sitesCollectionRef, formData);
+      }
+
+      setShowEditModal(false);
+      setEditingSite(null);
+      if (selectedSite && editingSite && editingSite.id === selectedSite.id) {
+        setSelectedSite({ ...selectedSite, ...formData });
+      }
+    } catch (error) {
+      console.error("Error saving site:", error);
+      alert("Error saving site. Please try again.");
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!editingSite || !db) return;
+
+    try {
+      const docRef = doc(db, SITES_COLLECTION_PATH, editingSite.id);
+      await deleteDoc(docRef);
+      setShowEditModal(false);
+      setShowDeleteConfirm(false);
+      setEditingSite(null);
+      if (selectedSite && editingSite.id === selectedSite.id) {
+        setSelectedSite(null);
+      }
+    } catch (error) {
+      console.error("Error deleting site:", error);
+      alert("Error deleting site. Please try again.");
+    }
+  };
+
+  const modalSecondaryButtonStyle = {
+    padding: "0.6rem 1.2rem",
+    backgroundColor: "transparent",
+    border: "1px solid rgba(148, 163, 184, 0.35)",
+    color: "#e2e8f0",
+    borderRadius: "0.5rem",
+    fontWeight: 600,
+    cursor: "pointer",
+    fontSize: "0.95rem",
+    transition: "all 0.2s ease",
+  };
+
+  const modalPrimaryButtonStyle = {
+    ...modalSecondaryButtonStyle,
+    backgroundColor: "rgba(34, 197, 94, 0.15)",
+    border: "1px solid rgba(34, 197, 94, 0.4)",
+    color: "#86efac",
+  };
+
+  const modalDangerButtonStyle = {
+    ...modalSecondaryButtonStyle,
+    backgroundColor: "rgba(239, 68, 68, 0.15)",
+    border: "1px solid rgba(239, 68, 68, 0.4)",
+    color: "#fca5a5",
+  };
+
+  return (
+    <Modal onClose={onClose}>
+      <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem", width: "100%", maxWidth: "60rem" }}>
+        <div>
+          <h3
+            style={{
+              fontSize: "1.5rem",
+              fontWeight: 700,
+              color: "#f8fafc",
+              marginBottom: "0.25rem",
+            }}
+          >
+            Site Search
+          </h3>
+          <p
+            style={{
+              fontSize: "1.0rem",
+              color: "#94a3b8",
+              margin: 0,
+            }}
+          >
+            
+          </p>
+        </div>
+
+        {/* Search Input */}
+        <div style={{ position: "relative" }}>
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="search"
+            style={{
+              width: "100%",
+              padding: "0.75rem 1rem",
+              backgroundColor: "#111",
+              color: "#fff",
+              border: "1px solid #fff",
+              borderRadius: "0.5rem",
+              fontSize: "1rem",
+              fontFamily: "monospace",
+              fontWeight: "bold",
+            }}
+          />
+          {filteredSites.length > 0 && (
+            <div
+              style={{
+                position: "absolute",
+                top: "100%",
+                left: 0,
+                right: 0,
+                backgroundColor: "#111",
+                border: "1px solid #fff",
+                borderTop: "none",
+                borderRadius: "0 0 0.5rem 0.5rem",
+                zIndex: 10,
+                maxHeight: "200px",
+                overflowY: "auto",
+              }}
+            >
+              {filteredSites.map((site) => (
+                <div
+                  key={site.id}
+                  onClick={() => handleSelectSite(site)}
+                  style={{
+                    padding: "0.75rem 1rem",
+                    cursor: "pointer",
+                    borderBottom: "1px solid #333",
+                    transition: "background-color 0.2s ease",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = "#333";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = "transparent";
+                  }}
+                >
+                  {site.address}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Site Details */}
+        {selectedSite && (
+          <div
+            style={{
+              border: "1px solid #333",
+              borderRadius: "0.5rem",
+              padding: "1.5rem",
+              backgroundColor: "rgba(15, 23, 42, 0.6)",
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
+              <h4 style={{ fontSize: "1.2rem", fontWeight: 700, color: "#f8fafc", margin: 0 }}>
+                {selectedSite.address}
+              </h4>
+              {hasAccess && (
+                <button
+                  type="button"
+                  onClick={() => handleEdit(selectedSite)}
+                  style={{
+                    padding: "0.5rem 1rem",
+                    backgroundColor: "transparent",
+                    border: "1px solid rgba(148, 163, 184, 0.35)",
+                    color: "#e2e8f0",
+                    borderRadius: "0.375rem",
+                    cursor: "pointer",
+                    fontSize: "0.9rem",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = "rgba(148, 163, 184, 0.1)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = "transparent";
+                  }}
+                >
+                  Edit
+                </button>
+              )}
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", paddingBottom: "0.5rem", borderBottom: "1px dashed #333" }}>
+                <span style={{ color: "#94a3b8" }}>Manager</span>
+                <span style={{ color: "#fff", fontWeight: 600 }}>{selectedSite.manager}</span>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", paddingBottom: "0.5rem", borderBottom: "1px dashed #333" }}>
+                <span style={{ color: "#94a3b8" }}>Blazer</span>
+                <span style={{ color: "#fff", fontWeight: 600 }}>{selectedSite.uniform?.blazer || "---"}</span>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", paddingBottom: "0.5rem", borderBottom: "1px dashed #333" }}>
+                <span style={{ color: "#94a3b8" }}>Pant</span>
+                <span style={{ color: "#fff", fontWeight: 600 }}>{selectedSite.uniform?.pant || "---"}</span>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", paddingBottom: "0.5rem", borderBottom: "1px dashed #333" }}>
+                <span style={{ color: "#94a3b8" }}>Shirt</span>
+                <span style={{ color: "#fff", fontWeight: 600 }}>{selectedSite.uniform?.shirt || "---"}</span>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between" }}>
+                <span style={{ color: "#94a3b8" }}>Tie</span>
+                <span style={{ color: "#fff", fontWeight: 600 }}>{selectedSite.uniform?.tie || "---"}</span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {hasAccess && (
+          <div style={{ display: "flex", justifyContent: "flex-end" }}>
+            <button
+              type="button"
+              onClick={handleCreateNew}
+              style={modalPrimaryButtonStyle}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = "rgba(34, 197, 94, 0.25)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = "rgba(34, 197, 94, 0.15)";
+              }}
+            >
+              Add New Site
+            </button>
+          </div>
+        )}
+
+        <div style={{ display: "flex", justifyContent: "flex-end" }}>
+          <button
+            type="button"
+            onClick={onClose}
+            style={modalSecondaryButtonStyle}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.border = "1px solid rgba(148, 163, 184, 0.55)";
+              e.currentTarget.style.color = "#f8fafc";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.border = "1px solid rgba(148, 163, 184, 0.35)";
+              e.currentTarget.style.color = "#e2e8f0";
+            }}
+          >
+            Close
+          </button>
+        </div>
+      </div>
+
+      {/* Edit/Create Modal */}
+      {showEditModal && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 50,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor: "rgba(0, 0, 0, 0.85)",
+            padding: "1rem",
+          }}
+          onClick={() => setShowEditModal(false)}
+        >
+          <div
+            style={{
+              backgroundColor: "#000",
+              border: "1px solid #fff",
+              borderRadius: "0.5rem",
+              padding: "1.5rem",
+              maxWidth: "600px",
+              width: "100%",
+              maxHeight: "90vh",
+              overflowY: "auto",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h4 style={{ fontSize: "1.25rem", fontWeight: 700, color: "#f8fafc", marginBottom: "1rem" }}>
+              {editingSite ? "Edit Site" : "Create New Site"}
+            </h4>
+            <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+              <div>
+                <label style={{ display: "block", color: "#94a3b8", marginBottom: "0.5rem", fontSize: "0.9rem" }}>
+                  Address *
+                </label>
+                <input
+                  type="text"
+                  value={formData.address}
+                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                  style={{
+                    width: "100%",
+                    padding: "0.75rem",
+                    backgroundColor: "#111",
+                    color: "#fff",
+                    border: "1px solid #fff",
+                    borderRadius: "0.375rem",
+                    fontSize: "1rem",
+                    fontFamily: "monospace",
+                  }}
+                  required
+                />
+              </div>
+              <div>
+                <label style={{ display: "block", color: "#94a3b8", marginBottom: "0.5rem", fontSize: "0.9rem" }}>
+                  Manager *
+                </label>
+                <input
+                  type="text"
+                  value={formData.manager}
+                  onChange={(e) => setFormData({ ...formData, manager: e.target.value })}
+                  style={{
+                    width: "100%",
+                    padding: "0.75rem",
+                    backgroundColor: "#111",
+                    color: "#fff",
+                    border: "1px solid #fff",
+                    borderRadius: "0.375rem",
+                    fontSize: "1rem",
+                    fontFamily: "monospace",
+                  }}
+                  required
+                />
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
+                <div>
+                  <label style={{ display: "block", color: "#94a3b8", marginBottom: "0.5rem", fontSize: "0.9rem" }}>
+                    Blazer
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.uniform.blazer}
+                    onChange={(e) => setFormData({ ...formData, uniform: { ...formData.uniform, blazer: e.target.value } })}
+                    style={{
+                      width: "100%",
+                      padding: "0.75rem",
+                      backgroundColor: "#111",
+                      color: "#fff",
+                      border: "1px solid #fff",
+                      borderRadius: "0.375rem",
+                      fontSize: "1rem",
+                      fontFamily: "monospace",
+                    }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: "block", color: "#94a3b8", marginBottom: "0.5rem", fontSize: "0.9rem" }}>
+                    Pant
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.uniform.pant}
+                    onChange={(e) => setFormData({ ...formData, uniform: { ...formData.uniform, pant: e.target.value } })}
+                    style={{
+                      width: "100%",
+                      padding: "0.75rem",
+                      backgroundColor: "#111",
+                      color: "#fff",
+                      border: "1px solid #fff",
+                      borderRadius: "0.375rem",
+                      fontSize: "1rem",
+                      fontFamily: "monospace",
+                    }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: "block", color: "#94a3b8", marginBottom: "0.5rem", fontSize: "0.9rem" }}>
+                    Shirt
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.uniform.shirt}
+                    onChange={(e) => setFormData({ ...formData, uniform: { ...formData.uniform, shirt: e.target.value } })}
+                    style={{
+                      width: "100%",
+                      padding: "0.75rem",
+                      backgroundColor: "#111",
+                      color: "#fff",
+                      border: "1px solid #fff",
+                      borderRadius: "0.375rem",
+                      fontSize: "1rem",
+                      fontFamily: "monospace",
+                    }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: "block", color: "#94a3b8", marginBottom: "0.5rem", fontSize: "0.9rem" }}>
+                    Tie
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.uniform.tie}
+                    onChange={(e) => setFormData({ ...formData, uniform: { ...formData.uniform, tie: e.target.value } })}
+                    style={{
+                      width: "100%",
+                      padding: "0.75rem",
+                      backgroundColor: "#111",
+                      color: "#fff",
+                      border: "1px solid #fff",
+                      borderRadius: "0.375rem",
+                      fontSize: "1rem",
+                      fontFamily: "monospace",
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", marginTop: "1.5rem", gap: "0.75rem" }}>
+              {editingSite && (
+                <button
+                  type="button"
+                  onClick={() => setShowDeleteConfirm(true)}
+                  style={modalDangerButtonStyle}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = "rgba(239, 68, 68, 0.25)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = "rgba(239, 68, 68, 0.15)";
+                  }}
+                >
+                  Delete
+                </button>
+              )}
+              <div style={{ display: "flex", gap: "0.75rem", marginLeft: "auto" }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowEditModal(false);
+                    setEditingSite(null);
+                  }}
+                  style={modalSecondaryButtonStyle}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.border = "1px solid rgba(148, 163, 184, 0.55)";
+                    e.currentTarget.style.color = "#f8fafc";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.border = "1px solid rgba(148, 163, 184, 0.35)";
+                    e.currentTarget.style.color = "#e2e8f0";
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSave}
+                  style={modalPrimaryButtonStyle}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = "rgba(34, 197, 94, 0.25)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = "rgba(34, 197, 94, 0.15)";
+                  }}
+                >
+                  Save
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 60,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor: "rgba(0, 0, 0, 0.9)",
+            padding: "1rem",
+          }}
+          onClick={() => setShowDeleteConfirm(false)}
+        >
+          <div
+            style={{
+              backgroundColor: "#000",
+              border: "1px solid #fff",
+              borderRadius: "0.5rem",
+              padding: "1.5rem",
+              maxWidth: "450px",
+              width: "100%",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h4 style={{ fontSize: "1.25rem", fontWeight: 700, color: "#f8fafc", marginBottom: "1rem" }}>
+              Confirm Deletion
+            </h4>
+            <p style={{ color: "#e2e8f0", marginBottom: "1.5rem", lineHeight: 1.5 }}>
+              Are you sure you want to delete this site?
+              <br />
+              <br />
+              <strong>{editingSite?.address}</strong>
+              <br />
+              <br />
+              This action cannot be undone.
+            </p>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem" }}>
+              <button
+                type="button"
+                onClick={() => setShowDeleteConfirm(false)}
+                style={modalSecondaryButtonStyle}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.border = "1px solid rgba(148, 163, 184, 0.55)";
+                  e.currentTarget.style.color = "#f8fafc";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.border = "1px solid rgba(148, 163, 184, 0.35)";
+                  e.currentTarget.style.color = "#e2e8f0";
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDelete}
+                style={modalDangerButtonStyle}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = "rgba(239, 68, 68, 0.25)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = "rgba(239, 68, 68, 0.15)";
+                }}
+              >
+                Confirm Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </Modal>
   );
 };
@@ -5361,6 +6774,17 @@ const App = () => {
       />
     );
   };
+  const openSearchModal = (selectedSite = null) => {
+    openModal(
+      <SiteSearchModal
+        onClose={closeModal}
+        hasAccess={hasAccess}
+        db={db}
+        initialSelectedSite={selectedSite}
+      />,
+      'siteSearch'
+    );
+  };
   // Delete user handler
   const handleDeleteUser = useCallback(async (userToDelete) => {
     const currentIsAdmin = Boolean(userInfo?.isAdmin);
@@ -5407,6 +6831,16 @@ const App = () => {
     );
   };
 
+  const openManagerDataModal = () => {
+    openModal(
+      <ManagerDataModal
+        weekData={weekData}
+        onClose={closeModal}
+        db={db}
+      />
+    );
+  };
+
   const openSummaryModal = () => {
     openModal(
       <SummaryModal
@@ -5415,6 +6849,7 @@ const App = () => {
         isAdmin={isAdmin}
         weekId={weekId}
         onOpenDetails={openDetailedSummaryModal}
+        onOpenManagerData={openManagerDataModal}
       />
     );
   };
@@ -5777,6 +7212,7 @@ const App = () => {
         onSignUp={openSignUpModal}
         userInfo={userInfo}
         hasAccess={hasAccess}
+        onOpenSearch={openSearchModal}
         onOpenAnalysis={handleOpenAnalysis}
         onOpenResearch={handleOpenResearch}
         onOpenSiteManager={handleOpenSiteManager}
@@ -5785,6 +7221,7 @@ const App = () => {
         onOpenSettings={openRegisteredUsersModal}
         onLogout={handleLogout}
         weekData={weekData}
+        db={db}
       />
 
       {/* Schedule Board */}
