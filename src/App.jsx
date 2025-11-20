@@ -81,6 +81,7 @@ const appId = "default-app-id";
 
 // --- Constants ---
 const ACCESS_CODE = "91965";
+const SUB_ADMIN_CODE = "Rochak";
 const DEFAULT_SITE_NAMES = [
   "Rochak Kadel",
   "736 Mission",
@@ -146,7 +147,7 @@ const DEFAULT_SITE_NAMES = [
   "Y.Perez Breaks (71S, 1019M, 90NM, 30G)",
   "I.Anwar Breaks (210P, 30ML, 111P)",
   "E.Walin Breaks (750B, 222K, 230C)",
-  "M.Horn Breaks (26O, 101M, 110S, 1K)",
+  "M.Horne Breaks (26OF, 101M, 110S, 1K)",
   
 ];
 const FONT_COLORS = ["#000000", "#FFFFFF", "#5d0909ff"]; // black, white, red
@@ -351,6 +352,17 @@ const stripParentheses = (siteName) => {
 };
 
 /**
+ * Extracts OPS name from parentheses in site name.
+ * Example: "600 Cal (N.Watson)" -> "N.Watson"
+ * Returns null if no parentheses found.
+ */
+const extractOpsName = (siteName) => {
+  if (!siteName || typeof siteName !== 'string') return null;
+  const match = siteName.match(/\(([^)]+)\)/);
+  return match ? match[1].trim() : null;
+};
+
+/**
  * Generates the 7 days for the current week.
  */
 const getWeekDays = (startDate) => {
@@ -459,8 +471,9 @@ const useUserAccess = () => {
   const signUp = async (firstName, lastName, code) => {
     const trimmedCode = code.trim();
     const isVip = trimmedCode === "12893";
+    const isSubAdmin = trimmedCode === SUB_ADMIN_CODE;
     const grantsEditAccess =
-      trimmedCode.length > 0 && (trimmedCode === ACCESS_CODE || isVip);
+      trimmedCode.length > 0 && (trimmedCode === ACCESS_CODE || isVip || isSubAdmin);
     const invalidCodeEntered = trimmedCode.length > 0 && !grantsEditAccess;
 
     const resolveUserId = async () => {
@@ -516,6 +529,7 @@ const useUserAccess = () => {
       initials: `${firstInitial}${lastInitial}`.toUpperCase(),
       hasAccess: grantsEditAccess,
       isAdmin: isVip,
+      isSubAdmin: isSubAdmin || false,
       userId: ensuredUserId,
       createdAt: new Date().toISOString(),
       syncedWithFirebase: !usedFallbackId,
@@ -939,6 +953,7 @@ const Header = ({
   db,
 }) => {
   const isAdmin = Boolean(userInfo?.isAdmin);
+  const isSubAdmin = Boolean(userInfo?.isSubAdmin);
   const [isAvatarMenuOpen, setIsAvatarMenuOpen] = useState(false);
   const avatarMenuRef = useClickOutside(() => setIsAvatarMenuOpen(false));
 
@@ -1099,7 +1114,7 @@ const Header = ({
         >
           Site Manager
         </button>
-        {isAdmin && (
+        {(isAdmin || isSubAdmin) && (
           <button
             className="micro-pressable micro-pill"
             type="button"
@@ -4000,7 +4015,7 @@ const DayNotesModal = ({
 /**
  * Summary Modal Component
  */
-const SummaryModal = ({ weekData, onClose, isAdmin, weekId, onOpenDetails, onOpenManagerData }) => {
+const SummaryModal = ({ weekData, onClose, isAdmin, weekId, onOpenDetails, onOpenManagerData, onOpenOpsData }) => {
   // Calculate hours from time string (e.g., "0800", "1600")
   const timeToHours = (timeStr) => {
     if (!timeStr || typeof timeStr !== 'string') return null;
@@ -4307,6 +4322,33 @@ const SummaryModal = ({ weekData, onClose, isAdmin, weekId, onOpenDetails, onOpe
                 }}
               >
                 Manager Data
+              </button>
+            )}
+            {onOpenOpsData && (
+              <button
+                type="button"
+                onClick={onOpenOpsData}
+                style={{
+                  padding: "0.5rem 1rem",
+                  backgroundColor: "rgba(59, 130, 246, 0.15)",
+                  border: "1px solid rgba(59, 130, 246, 0.45)",
+                  borderRadius: "0.5rem",
+                  color: "#60a5fa",
+                  fontSize: "0.95rem",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  transition: "all 0.2s ease",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = "rgba(59, 130, 246, 0.25)";
+                  e.currentTarget.style.border = "1px solid rgba(59, 130, 246, 0.65)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = "rgba(59, 130, 246, 0.15)";
+                  e.currentTarget.style.border = "1px solid rgba(59, 130, 246, 0.45)";
+                }}
+              >
+                Ops Data
               </button>
             )}
           </div>
@@ -5090,6 +5132,214 @@ const ManagerDataModal = ({ weekData, onClose, db }) => {
               cursor: "pointer",
               fontSize: "0.95rem",
               transition: "all 0.2s ease",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.border = "1px solid rgba(148, 163, 184, 0.55)";
+              e.currentTarget.style.color = "#f8fafc";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.border = "1px solid rgba(148, 163, 184, 0.35)";
+              e.currentTarget.style.color = "#e2e8f0";
+            }}
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+};
+
+/**
+ * Ops Data Modal Component
+ */
+const OpsDataModal = ({ weekData, onClose }) => {
+  // Calculate hours from time string
+  const timeToHours = (timeStr) => {
+    if (!timeStr || typeof timeStr !== 'string') return null;
+    const upperTime = timeStr.toUpperCase();
+    if (upperTime === 'XXXX') return null;
+    
+    const cleanTime = timeStr.replace(/[^0-9]/g, '');
+    if (cleanTime.length !== 4) return null;
+    
+    const hours = parseInt(cleanTime.substring(0, 2), 10);
+    const minutes = parseInt(cleanTime.substring(2, 4), 10);
+    
+    if (hours === 0 && minutes === 0) {
+      return 24.0;
+    }
+    
+    return hours + (minutes / 60);
+  };
+
+  // Calculate shift hours
+  const calculateShiftHours = (startTime, endTime) => {
+    const start = timeToHours(startTime);
+    const end = timeToHours(endTime);
+    
+    if (start === null || end === null) return 0;
+    
+    if (start === 24.0 && end === 24.0) {
+      return 24.0;
+    }
+    
+    let hours = end - start;
+    if (hours < 0) {
+      hours = (24 - start) + end;
+    } else if (end === 24.0 && start < 24) {
+      hours = 24 - start;
+    }
+    
+    return hours;
+  };
+
+  // Calculate OPS statistics
+  const opsStats = useMemo(() => {
+    const opsHours = {}; // { opsName: totalHours }
+
+    if (!weekData || !weekData.days) {
+      return [];
+    }
+
+    weekData.days.forEach(day => {
+      if (!day.shifts || !Array.isArray(day.shifts)) return;
+
+      day.shifts.forEach(shift => {
+        const startTime = shift.startTime || '';
+        const endTime = shift.endTime || '';
+        const upperStart = startTime.toUpperCase();
+        const upperEnd = endTime.toUpperCase();
+
+        // Skip shifts with xxxx time
+        if (upperStart === 'XXXX' || upperEnd === 'XXXX') return;
+
+        const shiftHours = calculateShiftHours(startTime, endTime);
+        if (shiftHours <= 0) return;
+
+        // Extract OPS name from parentheses (e.g., "600 Cal (N.Watson)" -> "N.Watson")
+        const opsName = extractOpsName(shift.site || '');
+        
+        if (!opsName) {
+          // No OPS name in parentheses, skip this shift
+          return;
+        }
+
+        // Initialize OPS if not exists
+        if (!opsHours[opsName]) {
+          opsHours[opsName] = 0;
+        }
+
+        // Add to total hours
+        opsHours[opsName] += shiftHours;
+      });
+    });
+
+    // Convert to array and sort by total hours (descending)
+    return Object.entries(opsHours)
+      .map(([opsName, totalHours]) => ({
+        opsName,
+        totalHours,
+      }))
+      .sort((a, b) => b.totalHours - a.totalHours);
+  }, [weekData]);
+
+  return (
+    <Modal onClose={onClose}>
+      <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem", width: "100%", maxWidth: "80rem" }}>
+        <div>
+          <h3
+            style={{
+              fontSize: "1.5rem",
+              fontWeight: 700,
+              color: "#f8fafc",
+              marginBottom: "0.25rem",
+            }}
+          >
+            F/S Standing Post
+          </h3>
+          <p
+            style={{
+              fontSize: "1.0rem",
+              color: "#94a3b8",
+              margin: 0,
+            }}
+          >
+            
+          </p>
+        </div>
+
+        {opsStats.length > 0 ? (
+          <div
+            style={{
+              backgroundColor: "rgba(15, 23, 42, 0.6)",
+              borderRadius: "0.75rem",
+              border: "1px solid rgba(148, 163, 184, 0.18)",
+              padding: "1.5rem",
+              overflowX: "auto",
+            }}
+          >
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+              {opsStats.map((item, index) => (
+                <div
+                  key={item.opsName}
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    padding: "0.75rem 1rem",
+                    backgroundColor: index % 2 === 0 ? "rgba(0, 0, 0, 0.3)" : "rgba(0, 0, 0, 0.1)",
+                    borderRadius: "0.5rem",
+                    border: "1px solid rgba(148, 163, 184, 0.1)",
+                  }}
+                >
+                  <span style={{ 
+                    fontSize: "1rem", 
+                    fontWeight: 600, 
+                    color: "#f8fafc",
+                  }}>
+                    {item.opsName}
+                  </span>
+                  <span style={{ 
+                    fontSize: "1rem", 
+                    fontWeight: 700, 
+                    color: "#3b82f6",
+                  }}>
+                    {item.totalHours.toFixed(1)} hrs
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div
+            style={{
+              padding: "3rem",
+              textAlign: "center",
+              color: "#94a3b8",
+              fontSize: "1rem",
+              backgroundColor: "rgba(15, 23, 42, 0.6)",
+              borderRadius: "0.75rem",
+              border: "1px solid rgba(148, 163, 184, 0.18)",
+            }}
+          >
+            No OPS data available for this week
+          </div>
+        )}
+
+        <div style={{ display: "flex", justifyContent: "flex-end" }}>
+          <button
+            type="button"
+            onClick={onClose}
+            style={{
+              padding: "0.6rem 1.2rem",
+              backgroundColor: "transparent",
+              border: "1px solid rgba(148, 163, 184, 0.35)",
+              color: "#e2e8f0",
+              borderRadius: "0.5rem",
+              fontWeight: 600,
+              cursor: "pointer",
+              transition: "all 0.15s ease",
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.border = "1px solid rgba(148, 163, 184, 0.55)";
@@ -5945,7 +6195,7 @@ const RegisteredUsersModal = ({ users, onClose, onDeleteUser, isAdmin }) => {
                   {user.initials || "??"}
                 </span>
                 <span>
-                  {user.isAdmin ? "Admin" : user.hasAccess ? "Editor" : "Viewer"}
+                  {user.isAdmin ? "Admin" : user.isSubAdmin ? "Sub-Admin" : user.hasAccess ? "Editor" : "Viewer"}
                 </span>
                 <span style={{ fontSize: "0.8rem", color: "#94a3b8" }}>
                   {formatTimestamp(user.createdAt)}
@@ -6841,6 +7091,15 @@ const App = () => {
     );
   };
 
+  const openOpsDataModal = () => {
+    openModal(
+      <OpsDataModal
+        weekData={weekData}
+        onClose={closeModal}
+      />
+    );
+  };
+
   const openSummaryModal = () => {
     openModal(
       <SummaryModal
@@ -6850,6 +7109,7 @@ const App = () => {
         weekId={weekId}
         onOpenDetails={openDetailedSummaryModal}
         onOpenManagerData={openManagerDataModal}
+        onOpenOpsData={openOpsDataModal}
       />
     );
   };
