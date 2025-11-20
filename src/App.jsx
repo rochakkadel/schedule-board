@@ -2604,7 +2604,7 @@ const ColorModal = ({ shift, day, onClose, onUpdateShift }) => {
               }}
             />
             <span style={{ color: "#f8fafc", fontSize: "1rem", fontWeight: 500 }}>
-              Strikeout Site Name
+              Strikeout 
             </span>
           </label>
         </div>
@@ -3787,17 +3787,23 @@ const DayNotesModal = ({
 const SummaryModal = ({ weekData, onClose, isAdmin, weekId, onOpenDetails }) => {
   // Calculate hours from time string (e.g., "0800", "1600")
   const timeToHours = (timeStr) => {
-    if (!timeStr || typeof timeStr !== 'string') return 0;
+    if (!timeStr || typeof timeStr !== 'string') return null;
     const upperTime = timeStr.toUpperCase();
     // Skip xxxx times
-    if (upperTime === 'XXXX') return 0;
+    if (upperTime === 'XXXX') return null;
     
     // Parse time string (format: "HHMM" or "HH:MM")
     const cleanTime = timeStr.replace(/[^0-9]/g, '');
-    if (cleanTime.length !== 4) return 0;
+    if (cleanTime.length !== 4) return null;
     
     const hours = parseInt(cleanTime.substring(0, 2), 10);
     const minutes = parseInt(cleanTime.substring(2, 4), 10);
+    
+    // Handle midnight (0000) as 24 hours for correct overnight shift calculation
+    // e.g., 1600-0000 should be 4pm to midnight = 8 hours
+    if (hours === 0 && minutes === 0) {
+      return 24.0;
+    }
     
     return hours + (minutes / 60);
   };
@@ -3807,12 +3813,23 @@ const SummaryModal = ({ weekData, onClose, isAdmin, weekId, onOpenDetails }) => 
     const start = timeToHours(startTime);
     const end = timeToHours(endTime);
     
-    if (start === 0 || end === 0) return 0;
+    // Return 0 if either time is invalid (null means invalid/XXXX)
+    if (start === null || end === null) return 0;
     
-    // Handle overnight shifts (end < start)
+    // Special case: both start and end are midnight (0000) = 24 hours
+    if (start === 24.0 && end === 24.0) {
+      return 24.0;
+    }
+    
+    // Handle overnight shifts (end < start or end === 24)
     let hours = end - start;
     if (hours < 0) {
+      // Normal overnight shift (e.g., 2200-0600)
       hours = (24 - start) + end;
+    } else if (end === 24.0 && start < 24) {
+      // Shift ending at midnight (0000), treated as 24.0
+      // e.g., 1600-0000 = 16 to 24 = 8 hours (correct!)
+      hours = 24 - start;
     }
     
     return hours;
@@ -4077,17 +4094,23 @@ const SummaryModal = ({ weekData, onClose, isAdmin, weekId, onOpenDetails }) => 
 const DetailedSummaryModal = ({ weekData, onClose }) => {
   // Calculate hours from time string (e.g., "0800", "1600")
   const timeToHours = (timeStr) => {
-    if (!timeStr || typeof timeStr !== 'string') return 0;
+    if (!timeStr || typeof timeStr !== 'string') return null;
     const upperTime = timeStr.toUpperCase();
     // Skip xxxx times
-    if (upperTime === 'XXXX') return 0;
+    if (upperTime === 'XXXX') return null;
     
     // Parse time string (format: "HHMM" or "HH:MM")
     const cleanTime = timeStr.replace(/[^0-9]/g, '');
-    if (cleanTime.length !== 4) return 0;
+    if (cleanTime.length !== 4) return null;
     
     const hours = parseInt(cleanTime.substring(0, 2), 10);
     const minutes = parseInt(cleanTime.substring(2, 4), 10);
+    
+    // Handle midnight (0000) as 24 hours for correct overnight shift calculation
+    // e.g., 1600-0000 should be 4pm to midnight = 8 hours
+    if (hours === 0 && minutes === 0) {
+      return 24.0;
+    }
     
     return hours + (minutes / 60);
   };
@@ -4097,12 +4120,23 @@ const DetailedSummaryModal = ({ weekData, onClose }) => {
     const start = timeToHours(startTime);
     const end = timeToHours(endTime);
     
-    if (start === 0 || end === 0) return 0;
+    // Return 0 if either time is invalid (null means invalid/XXXX)
+    if (start === null || end === null) return 0;
     
-    // Handle overnight shifts (end < start)
+    // Special case: both start and end are midnight (0000) = 24 hours
+    if (start === 24.0 && end === 24.0) {
+      return 24.0;
+    }
+    
+    // Handle overnight shifts (end < start or end === 24)
     let hours = end - start;
     if (hours < 0) {
+      // Normal overnight shift (e.g., 2200-0600)
       hours = (24 - start) + end;
+    } else if (end === 24.0 && start < 24) {
+      // Shift ending at midnight (0000), treated as 24.0
+      // e.g., 1600-0000 = 16 to 24 = 8 hours (correct!)
+      hours = 24 - start;
     }
     
     return hours;
