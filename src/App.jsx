@@ -1164,6 +1164,7 @@ const Shift = ({ shift, onContextMenu, onDoubleClick, topUserInitials }) => {
     bgColor,
     fontColor,
     comments,
+    isStrikeout,
   } = shift;
 
   const effectiveBgColor = bgColor || "#FFFFFF";
@@ -1283,6 +1284,7 @@ const Shift = ({ shift, onContextMenu, onDoubleClick, topUserInitials }) => {
             letterSpacing: "0.04em",
             fontWeight: 700,
             lineHeight: isOps ? "1.0" : "inherit",
+            textDecoration: isStrikeout ? "line-through" : "none",
           }}
         >
           {displayText}
@@ -2467,6 +2469,7 @@ const ColorModal = ({ shift, day, onClose, onUpdateShift }) => {
   // Always use the actual shift colors, even if it's marked as complete/ops
   const [fontColor, setFontColor] = useState(shift.fontColor || "#000000");
   const [bgColor, setBgColor] = useState(shift.bgColor || "#FFFFFF");
+  const [isStrikeout, setIsStrikeout] = useState(shift.isStrikeout || false);
 
   const handleBgColorChange = (newBgColor) => {
     setBgColor(newBgColor);
@@ -2484,6 +2487,7 @@ const ColorModal = ({ shift, day, onClose, onUpdateShift }) => {
       ...shift,
       fontColor,
       bgColor,
+      isStrikeout,
     };
     onUpdateShift(day, updatedShift);
     onClose();
@@ -2561,6 +2565,49 @@ const ColorModal = ({ shift, day, onClose, onUpdateShift }) => {
           selected={bgColor}
           onChange={handleBgColorChange}
         />
+        
+        {/* Strikeout Option */}
+        <div style={{ display: "flex", flexDirection: "column", gap: "0.65rem" }}>
+          <span style={{ ...modalLabelStyle, marginBottom: 0 }}>Text Style</span>
+          <label
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "0.75rem",
+              cursor: "pointer",
+              padding: "0.5rem",
+              borderRadius: "0.5rem",
+              backgroundColor: isStrikeout ? "rgba(59, 130, 246, 0.15)" : "transparent",
+              border: isStrikeout ? "1px solid rgba(59, 130, 246, 0.4)" : "1px solid rgba(148, 163, 184, 0.2)",
+              transition: "all 0.2s ease",
+            }}
+            onMouseEnter={(e) => {
+              if (!isStrikeout) {
+                e.currentTarget.style.backgroundColor = "rgba(148, 163, 184, 0.08)";
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (!isStrikeout) {
+                e.currentTarget.style.backgroundColor = "transparent";
+              }
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={isStrikeout}
+              onChange={(e) => setIsStrikeout(e.target.checked)}
+              style={{
+                width: "1.25rem",
+                height: "1.25rem",
+                cursor: "pointer",
+                accentColor: "#3b82f6",
+              }}
+            />
+            <span style={{ color: "#f8fafc", fontSize: "1rem", fontWeight: 500 }}>
+              Strikeout Site Name
+            </span>
+          </label>
+        </div>
         </div>
 
         <div
@@ -2595,6 +2642,7 @@ const ColorModal = ({ shift, day, onClose, onUpdateShift }) => {
                 fontWeight: 700,
                 fontSize: "1.05rem",
                 color: fontColor,
+                textDecoration: isStrikeout ? "line-through" : "none",
               }}
           >
             {shift.site} {shift.startTime}-{shift.endTime}
