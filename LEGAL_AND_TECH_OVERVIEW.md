@@ -16,15 +16,6 @@ The application stores schedule data, user profiles, and comments in Firebase Fi
 
 Data is encrypted in transit and at rest by Firebase. User profiles are cached locally for offline functionality.
 
-## Features
-
-- Weekly calendar view for shift management
-- Color-coded shifts with time ranges and site assignments
-- Comments and notes for daily and shift-level communication
-- Access control via access codes
-- Real-time synchronization across users
-- Offline functionality with local storage
-- Leaderboard tracking shift assignments
 
 ## Technology
 
