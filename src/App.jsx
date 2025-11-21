@@ -146,7 +146,7 @@ const DEFAULT_SITE_NAMES = [
   "A.Hayes Breaks (425C, 101M, 153K, 150P)",
   "Y.Perez Breaks (71S, 1019M, 90NM, 30G)",
   "I.Anwar Breaks (210P, 30ML, 111P)",
-  "E.Walin Breaks (750B, 222K, 230C)",
+  "E.Walin Breaks (750B, 222K)",
   "M.Horne Breaks (26OF, 101M, 110S, 1K)",
   
 ];
