@@ -664,22 +664,22 @@ const Leaderboard = ({ weekData }) => {
 
   const getTrophyIcon = (index) => {
     if (index === 0) {
-      return "🏆"; // Trophy (Titan style)
-    } else if (index === 1) {
       return "🥇"; // Gold Medal
-    } else if (index === 2) {
+    } else if (index === 1) {
       return "🥈"; // Silver Medal
+    } else if (index === 2) {
+      return "🥉"; // Bronze Medal
     }
     return null;
   };
 
   const getTrophyColor = (index) => {
     if (index === 0) {
-      return "#8B5CF6"; // Titan (Purple/Violet)
-    } else if (index === 1) {
       return "#FFD700"; // Gold
+    } else if (index === 1) {
+      return "#FFFFFF"; // White
     } else if (index === 2) {
-      return "#C0C0C0"; // Silver
+      return "#CD7F32"; // Bronze
     }
     return "#94a3b8";
   };
@@ -725,19 +725,19 @@ const Leaderboard = ({ weekData }) => {
               padding: "0.35rem 0.65rem",
               position: "relative",
               backgroundColor: index === 0 
-                ? "rgba(139, 92, 246, 0.2)" 
+                ? "rgba(255, 215, 0, 0.15)" 
                 : index === 1
-                ? "rgba(255, 215, 0, 0.15)"
-                : index === 2
                 ? "rgba(192, 192, 192, 0.15)"
+                : index === 2
+                ? "rgba(205, 127, 50, 0.15)"
                 : "rgba(148, 163, 184, 0.1)",
               borderRadius: "0.375rem",
               border: index === 0 
-                ? "2px solid rgba(139, 92, 246, 0.7)" 
+                ? "1px solid rgba(255, 215, 0, 0.4)" 
                 : index === 1
-                ? "1px solid rgba(255, 215, 0, 0.4)"
-                : index === 2
                 ? "1px solid rgba(192, 192, 192, 0.4)"
+                : index === 2
+                ? "1px solid rgba(205, 127, 50, 0.4)"
                 : "1px solid rgba(148, 163, 184, 0.2)",
             }}
           >
@@ -746,14 +746,10 @@ const Leaderboard = ({ weekData }) => {
                 style={{ 
                   fontSize: index === 0 ? "1.4rem" : "1.2rem",
                   ...(index === 0 && {
-                    filter: "drop-shadow(0 0 8px rgba(139, 92, 246, 1)) drop-shadow(0 0 16px rgba(124, 58, 237, 0.8)) drop-shadow(0 0 24px rgba(109, 40, 217, 0.6))",
-                    animation: "titanShine 2.5s ease-in-out infinite",
-                  }),
-                  ...(index === 1 && {
                     filter: "drop-shadow(0 0 4px rgba(255, 215, 0, 0.9)) drop-shadow(0 0 8px rgba(255, 193, 7, 0.7)) drop-shadow(0 0 12px rgba(255, 152, 0, 0.5))",
                     animation: "goldGlow 2s ease-in-out infinite alternate",
                   }),
-                  ...(index === 2 && {
+                  ...(index === 1 && {
                     filter: "drop-shadow(0 0 4px rgba(192, 192, 192, 0.9)) drop-shadow(0 0 8px rgba(169, 169, 169, 0.7)) drop-shadow(0 0 12px rgba(128, 128, 128, 0.5))",
                     animation: "silverGlow 2s ease-in-out infinite alternate",
                   }),
@@ -767,6 +763,10 @@ const Leaderboard = ({ weekData }) => {
                 fontSize: "1.1rem",
                 fontWeight: 700,
                 color: getTrophyColor(index),
+                ...(index === 0 && {
+                  textShadow: "0 0 8px rgba(255, 215, 0, 0.8), 0 0 15px rgba(255, 193, 7, 0.6), 0 0 25px rgba(255, 140, 0, 0.4)",
+                  animation: "goldTextGlow 3s ease-in-out infinite",
+                }),
               }}
             >
               {item.initials}
@@ -776,6 +776,10 @@ const Leaderboard = ({ weekData }) => {
                 fontSize: "1.0rem",
                 color: getTrophyColor(index),
                 fontWeight: 600,
+                ...(index === 0 && {
+                  textShadow: "0 0 8px rgba(255, 215, 0, 0.8), 0 0 15px rgba(255, 193, 7, 0.6), 0 0 25px rgba(255, 140, 0, 0.4)",
+                  animation: "goldTextGlow 3s ease-in-out infinite",
+                }),
               }}
             >
               {item.count}
@@ -1080,7 +1084,7 @@ const Header = ({
             e.currentTarget.style.transform = "none";
           }}
         >
-          Tracktit
+          Tracktik
         </button>
         <button
           className="micro-pressable micro-pill"
@@ -3346,6 +3350,7 @@ const CommentModal = ({
       text: newComment,
       date: new Date().toISOString(),
       isAdmin: isAdmin || false, // Store admin status with comment
+      isSubAdmin: Boolean(userInfo?.isSubAdmin) || false, // Store sub-admin status with comment
     };
 
     const updatedShift = {
@@ -3413,6 +3418,7 @@ const CommentModal = ({
             const initials = extractInitials(comment.user);
             // Simply check if the comment has isAdmin flag set to true
             const isAdminUser = comment.isAdmin === true;
+            const isSubAdminUser = comment.isSubAdmin === true;
             return (
               <div
                 key={comment.id}
@@ -3489,7 +3495,7 @@ const CommentModal = ({
                         position: "relative",
                         display: "inline-block",
                         fontWeight: 600, 
-                        color: isAdminUser ? "#FFD700" : "#f1f5f9", 
+                        color: isAdminUser ? "#FFD700" : isSubAdminUser ? "#C0C0C0" : "#f1f5f9", 
                         fontSize: "0.95rem",
                         ...(isAdminUser && {
                           background: "linear-gradient(90deg, #FFD700 0%, #FFF700 25%, #FFA500 50%, #FFF700 75%, #FFD700 100%)",
@@ -3499,6 +3505,15 @@ const CommentModal = ({
                           backgroundClip: "text",
                           animation: "shimmer 3s linear infinite",
                           filter: "drop-shadow(0 0 3px rgba(255, 215, 0, 0.8))",
+                        }),
+                        ...(isSubAdminUser && {
+                          background: "linear-gradient(90deg, #C0C0C0 0%, #E8E8E8 25%, #A9A9A9 50%, #E8E8E8 75%, #C0C0C0 100%)",
+                          backgroundSize: "200% 100%",
+                          WebkitBackgroundClip: "text",
+                          WebkitTextFillColor: "transparent",
+                          backgroundClip: "text",
+                          animation: "shimmer 3s linear infinite",
+                          filter: "drop-shadow(0 0 3px rgba(192, 192, 192, 0.8))",
                         }),
                       }}
                     >
@@ -3712,6 +3727,7 @@ const DayNotesModal = ({
       text: newNote,
       date: new Date().toISOString(),
       isAdmin: isAdmin || false, // Store admin status with note
+      isSubAdmin: Boolean(userInfo?.isSubAdmin) || false, // Store sub-admin status with note
     };
 
     onUpdateDayNotes(day, [...dayNotes, note]);
@@ -3774,6 +3790,7 @@ const DayNotesModal = ({
             const initials = extractInitials(note.user);
             // Simply check if the note has isAdmin flag set to true
             const isAdminUser = note.isAdmin === true;
+            const isSubAdminUser = note.isSubAdmin === true;
             return (
               <div
                 key={note.id}
@@ -3850,7 +3867,7 @@ const DayNotesModal = ({
                         position: "relative",
                         display: "inline-block",
                         fontWeight: 600, 
-                        color: isAdminUser ? "#FFD700" : "#f1f5f9", 
+                        color: isAdminUser ? "#FFD700" : isSubAdminUser ? "#C0C0C0" : "#f1f5f9", 
                         fontSize: "0.95rem",
                         ...(isAdminUser && {
                           background: "linear-gradient(90deg, #FFD700 0%, #FFF700 25%, #FFA500 50%, #FFF700 75%, #FFD700 100%)",
@@ -3860,6 +3877,15 @@ const DayNotesModal = ({
                           backgroundClip: "text",
                           animation: "shimmer 3s linear infinite",
                           filter: "drop-shadow(0 0 3px rgba(255, 215, 0, 0.8))",
+                        }),
+                        ...(isSubAdminUser && {
+                          background: "linear-gradient(90deg, #C0C0C0 0%, #E8E8E8 25%, #A9A9A9 50%, #E8E8E8 75%, #C0C0C0 100%)",
+                          backgroundSize: "200% 100%",
+                          WebkitBackgroundClip: "text",
+                          WebkitTextFillColor: "transparent",
+                          backgroundClip: "text",
+                          animation: "shimmer 3s linear infinite",
+                          filter: "drop-shadow(0 0 3px rgba(192, 192, 192, 0.8))",
                         }),
                       }}
                     >
@@ -4294,7 +4320,7 @@ const SummaryModal = ({ weekData, onClose, isAdmin, weekId, onOpenDetails, onOpe
 
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "0.75rem" }}>
           <div style={{ display: "flex", gap: "0.75rem" }}>
-            {onOpenDetails && (
+            {isAdmin && onOpenDetails && (
               <button
                 type="button"
                 onClick={onOpenDetails}
@@ -4321,7 +4347,7 @@ const SummaryModal = ({ weekData, onClose, isAdmin, weekId, onOpenDetails, onOpe
                 More Detail
               </button>
             )}
-            {onOpenManagerData && (
+            {isAdmin && onOpenManagerData && (
               <button
                 type="button"
                 onClick={onOpenManagerData}
@@ -4348,7 +4374,7 @@ const SummaryModal = ({ weekData, onClose, isAdmin, weekId, onOpenDetails, onOpe
                 Manager Data
               </button>
             )}
-            {onOpenOpsData && (
+            {isAdmin && onOpenOpsData && (
               <button
                 type="button"
                 onClick={onOpenOpsData}
@@ -6686,6 +6712,7 @@ const App = () => {
   
   // Get isAdmin status
   const isAdmin = Boolean(userInfo?.isAdmin);
+  const isSubAdmin = Boolean(userInfo?.isSubAdmin);
 
   // --- Firestore Update Functions ---
 
@@ -7601,3 +7628,5 @@ const App = () => {
 }
 
 export default App;
+
+
