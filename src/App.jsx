@@ -1061,6 +1061,30 @@ const Header = ({
         <button
           className="micro-pressable micro-pill"
           type="button"
+          onClick={() => {
+            window.open(
+              "https://palamerican.staffr.net/app#patrol/default/index",
+              "_blank",
+              "noopener,noreferrer"
+            );
+          }}
+          style={linkButtonStyle}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.border = "1px solid rgba(239, 68, 68, 0.75)";
+            e.currentTarget.style.color = "#fca5a5";
+            e.currentTarget.style.transform = "translateY(-1px)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.border = "1px solid rgba(148, 163, 184, 0.45)";
+            e.currentTarget.style.color = "#e2e8f0";
+            e.currentTarget.style.transform = "none";
+          }}
+        >
+          Tracktit
+        </button>
+        <button
+          className="micro-pressable micro-pill"
+          type="button"
           onClick={onOpenAnalysis}
           style={linkButtonStyle}
           onMouseEnter={(e) => {
@@ -1172,7 +1196,7 @@ const Header = ({
           <span
             style={{
               color: "#ffffff",
-              fontSize: "0.70rem",
+              fontSize: "0.90rem",
               letterSpacing: "0.08em",
               textTransform: "uppercase",
               textShadow: "0 0 6px rgba(255, 191, 0, 0.75)",
