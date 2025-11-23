@@ -690,7 +690,7 @@ const Leaderboard = ({ weekData }) => {
         display: "flex",
         alignItems: "center",
         gap: "0.5rem",
-        padding: "0.5rem 0.75rem",
+        padding: "0.65rem 0.95rem",
         backgroundColor: "rgba(15, 23, 42, 0.65)",
         borderRadius: "0.5rem",
         border: "1px solid rgba(148, 163, 184, 0.25)",
@@ -711,7 +711,7 @@ const Leaderboard = ({ weekData }) => {
         style={{
           display: "flex",
           alignItems: "center",
-          gap: "0.4rem",
+          gap: "0.5rem",
           flexWrap: "wrap",
         }}
       >
@@ -721,8 +721,8 @@ const Leaderboard = ({ weekData }) => {
             style={{
               display: "flex",
               alignItems: "center",
-              gap: "0.25rem",
-              padding: "0.25rem 0.5rem",
+              gap: "0.35rem",
+              padding: "0.35rem 0.65rem",
               position: "relative",
               backgroundColor: index === 0 
                 ? "rgba(139, 92, 246, 0.2)" 
@@ -744,7 +744,7 @@ const Leaderboard = ({ weekData }) => {
             {getTrophyIcon(index) && (
               <span 
                 style={{ 
-                  fontSize: index === 0 ? "1.2rem" : "1.0rem",
+                  fontSize: index === 0 ? "1.4rem" : "1.2rem",
                   ...(index === 0 && {
                     filter: "drop-shadow(0 0 8px rgba(139, 92, 246, 1)) drop-shadow(0 0 16px rgba(124, 58, 237, 0.8)) drop-shadow(0 0 24px rgba(109, 40, 217, 0.6))",
                     animation: "titanShine 2.5s ease-in-out infinite",
@@ -764,7 +764,7 @@ const Leaderboard = ({ weekData }) => {
             )}
             <span
               style={{
-                fontSize: "0.9rem",
+                fontSize: "1.1rem",
                 fontWeight: 700,
                 color: getTrophyColor(index),
               }}
@@ -773,7 +773,7 @@ const Leaderboard = ({ weekData }) => {
             </span>
             <span
               style={{
-                fontSize: "0.8rem",
+                fontSize: "1.0rem",
                 color: getTrophyColor(index),
                 fontWeight: 600,
               }}
