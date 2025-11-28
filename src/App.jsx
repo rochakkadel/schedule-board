@@ -5471,25 +5471,87 @@ const ManagerDataModal = ({ weekData, onClose, db, startDate, endDate, onBack })
     return normalized.toUpperCase();
   };
 
+  // Helper to check if a site name is related to Sutro Tower
+  const isSutroTowerSite = (siteName) => {
+    if (!siteName) return false;
+    const normalized = normalizeSiteName(siteName);
+    return normalized.includes('SUTRO') || 
+           normalized.includes('TOWER') || 
+           normalized === '1 LA' || 
+           normalized === '1LA' || 
+           normalized.includes('1 LA') || 
+           normalized.includes('1LA') ||
+           normalized.includes('1 LA AVANZADA') ||
+           normalized.includes('1LA AVANZADA') ||
+           normalized.includes('LA AVANZADA') ||
+           (normalized.includes('1') && normalized.includes('AVANZADA'));
+  };
+
   // Helper to match shift site to site directory site
   const findSiteMatch = (shiftSiteName) => {
-    const normalizedShift = normalizeSiteName(shiftSiteName);
+    if (!shiftSiteName) return null;
+    
+    // First strip parentheses to get base site name
+    const baseSiteName = stripParentheses(shiftSiteName);
+    const normalizedShift = normalizeSiteName(baseSiteName);
+    
+    if (!normalizedShift) return null;
+    
+    // Check if shift site is Sutro Tower related
+    const isShiftSutro = isSutroTowerSite(normalizedShift);
     
     // Try exact match first (after normalization)
     let match = sites.find(site => {
-      const normalizedAddress = (site.address || '').toUpperCase();
+      if (!site.address) return false;
+      const normalizedAddress = normalizeSiteName(site.address);
+      
+      // Special case for Sutro Tower - match any Sutro Tower variation
+      if (isShiftSutro && isSutroTowerSite(normalizedAddress)) {
+        return true;
+      }
+      
       return normalizedAddress === normalizedShift;
     });
 
     // Try partial match (shift site contains site address or vice versa)
     if (!match) {
       match = sites.find(site => {
-        const normalizedAddress = (site.address || '').toUpperCase();
+        if (!site.address) return false;
+        const normalizedAddress = normalizeSiteName(site.address);
+        
+        // Special case for Sutro Tower - match any Sutro Tower variation
+        if (isShiftSutro && isSutroTowerSite(normalizedAddress)) {
+          return true;
+        }
+        
         // Check if shift site contains address or address contains shift site
-        return normalizedAddress.includes(normalizedShift) || 
-               normalizedShift.includes(normalizedAddress) ||
+        if (normalizedAddress.includes(normalizedShift) || normalizedShift.includes(normalizedAddress)) {
+          return true;
+        }
                // Also try matching without common suffixes
-               normalizedAddress.replace(/\s+(ST|AVE|BLVD|STREET|AVENUE|BOULEVARD)$/i, '') === normalizedShift.replace(/\s+(ST|AVE|BLVD|STREET|AVENUE|BOULEVARD)$/i, '');
+        const addressNoSuffix = normalizedAddress.replace(/\s+(ST|AVE|BLVD|STREET|AVENUE|BOULEVARD|RD|ROAD|DR|DRIVE|CT|COURT|PL|PLACE|WAY|LN|LANE)$/i, '').trim();
+        const shiftNoSuffix = normalizedShift.replace(/\s+(ST|AVE|BLVD|STREET|AVENUE|BOULEVARD|RD|ROAD|DR|DRIVE|CT|COURT|PL|PLACE|WAY|LN|LANE)$/i, '').trim();
+        if (addressNoSuffix && shiftNoSuffix && addressNoSuffix === shiftNoSuffix) {
+          return true;
+        }
+        // Try matching just the numbers/address part (e.g., "600 CAL" matches "600 CALIFORNIA", "146 GEARY" matches "146 GEARY ST")
+        const addressNumbers = normalizedAddress.match(/^\d+/);
+        const shiftNumbers = normalizedShift.match(/^\d+/);
+        if (addressNumbers && shiftNumbers && addressNumbers[0] === shiftNumbers[0]) {
+          // If numbers match, check if the rest is similar
+          const addressRest = normalizedAddress.replace(/^\d+\s*/, '').substring(0, 3);
+          const shiftRest = normalizedShift.replace(/^\d+\s*/, '').substring(0, 3);
+          if (addressRest && shiftRest && addressRest === shiftRest) {
+            return true;
+          }
+          // Also check if the street name matches (e.g., "146 GEARY" matches "146 GEARY ST")
+          const addressStreet = normalizedAddress.replace(/^\d+\s*/, '').split(/\s+(ST|AVE|BLVD|STREET|AVENUE|BOULEVARD|RD|ROAD|DR|DRIVE|CT|COURT|PL|PLACE|WAY|LN|LANE)$/i)[0].trim();
+          const shiftStreet = normalizedShift.replace(/^\d+\s*/, '').split(/\s+(ST|AVE|BLVD|STREET|AVENUE|BOULEVARD|RD|ROAD|DR|DRIVE|CT|COURT|PL|PLACE|WAY|LN|LANE)$/i)[0].trim();
+          if (addressStreet && shiftStreet && addressStreet === shiftStreet) {
+            return true;
+          }
+        }
+        return false;
       });
     }
 
@@ -5539,8 +5601,14 @@ const ManagerDataModal = ({ weekData, onClose, db, startDate, endDate, onBack })
   // Calculate manager statistics using filtered data
   const managerStats = useMemo(() => {
     const managerHours = {}; // { managerName: { totalHours: 0, opsHours: 0 } }
+    const unmatchedShifts = []; // Track unmatched shifts for debugging
 
-    if (!filteredWeekData || !filteredWeekData.days || !sites.length) {
+    if (!filteredWeekData || !filteredWeekData.days) {
+      return [];
+    }
+
+    // Don't return empty array if sites haven't loaded yet - wait for sites
+    if (!sites.length) {
       return [];
     }
 
@@ -5559,14 +5627,17 @@ const ManagerDataModal = ({ weekData, onClose, db, startDate, endDate, onBack })
         const shiftHours = calculateShiftHours(startTime, endTime);
         if (shiftHours <= 0) return;
 
-        // Strip parentheses from site name for matching (e.g., "600 Cal (N.Watson)" -> "600 Cal")
-        const shiftSite = stripParentheses(shift.site || '');
+        // Use the site name directly (findSiteMatch will handle stripping)
+        const shiftSite = shift.site || '';
         
         // Find matching site in directory
         const matchedSite = findSiteMatch(shiftSite);
         
         if (!matchedSite || !matchedSite.manager) {
-          // If no match found, skip this shift
+          // Track unmatched shifts for debugging (only log first few to avoid spam)
+          if (unmatchedShifts.length < 10) {
+            unmatchedShifts.push({ site: shiftSite, hours: shiftHours });
+          }
           return;
         }
 
@@ -5601,6 +5672,11 @@ const ManagerDataModal = ({ weekData, onClose, db, startDate, endDate, onBack })
         }
       });
     });
+
+    // Log unmatched shifts for debugging (only in development)
+    if (unmatchedShifts.length > 0 && process.env.NODE_ENV === 'development') {
+      console.log('Unmatched shifts in Manager Data:', unmatchedShifts);
+    }
 
     // Convert to array and sort by total hours (descending)
     return Object.entries(managerHours)
@@ -6635,6 +6711,8 @@ const SiteSearchModal = ({ onClose, hasAccess, db, initialSelectedSite = null })
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [editingSite, setEditingSite] = useState(null);
+  const [addressSuggestions, setAddressSuggestions] = useState([]);
+  const [showAddressSuggestions, setShowAddressSuggestions] = useState(false);
   const [formData, setFormData] = useState({
     address: "",
     manager: "",
@@ -6778,6 +6856,22 @@ const SiteSearchModal = ({ onClose, hasAccess, db, initialSelectedSite = null })
     );
     setFilteredSites(matches);
   }, [searchQuery, sites]);
+
+  // Filter address suggestions for edit modal
+  useEffect(() => {
+    if (!formData.address.trim() || !showEditModal) {
+      setAddressSuggestions([]);
+      setShowAddressSuggestions(false);
+      return;
+    }
+
+    const query = formData.address.toLowerCase();
+    const matches = sites
+      .filter((site) => site.address?.toLowerCase().includes(query))
+      .slice(0, 5); // Limit to 5 suggestions
+    setAddressSuggestions(matches);
+    setShowAddressSuggestions(matches.length > 0);
+  }, [formData.address, sites, showEditModal]);
 
   const handleSelectSite = (site) => {
     setSelectedSite(site);
@@ -7104,14 +7198,26 @@ const SiteSearchModal = ({ onClose, hasAccess, db, initialSelectedSite = null })
               {editingSite ? "Edit Site" : "Create New Site"}
             </h4>
             <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-              <div>
+              <div style={{ position: "relative" }}>
                 <label style={{ display: "block", color: "#94a3b8", marginBottom: "0.5rem", fontSize: "0.9rem" }}>
                   Address *
                 </label>
                 <input
                   type="text"
                   value={formData.address}
-                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                  onChange={(e) => {
+                    setFormData({ ...formData, address: e.target.value });
+                    setShowAddressSuggestions(true);
+                  }}
+                  onFocus={() => {
+                    if (addressSuggestions.length > 0) {
+                      setShowAddressSuggestions(true);
+                    }
+                  }}
+                  onBlur={() => {
+                    // Delay hiding to allow click on suggestion
+                    setTimeout(() => setShowAddressSuggestions(false), 200);
+                  }}
                   style={{
                     width: "100%",
                     padding: "0.75rem",
@@ -7124,6 +7230,55 @@ const SiteSearchModal = ({ onClose, hasAccess, db, initialSelectedSite = null })
                   }}
                   required
                 />
+                {showAddressSuggestions && addressSuggestions.length > 0 && (
+                  <div
+                    style={{
+                      position: "absolute",
+                      top: "100%",
+                      left: 0,
+                      right: 0,
+                      backgroundColor: "#111",
+                      border: "1px solid #fff",
+                      borderTop: "none",
+                      borderRadius: "0 0 0.375rem 0.375rem",
+                      zIndex: 100,
+                      maxHeight: "200px",
+                      overflowY: "auto",
+                    }}
+                  >
+                    {addressSuggestions.map((site) => (
+                      <div
+                        key={site.id}
+                        onClick={() => {
+                          setFormData({
+                            ...formData,
+                            address: site.address,
+                            manager: site.manager || formData.manager,
+                            uniform: site.uniform || formData.uniform,
+                          });
+                          setShowAddressSuggestions(false);
+                        }}
+                        style={{
+                          padding: "0.75rem",
+                          cursor: "pointer",
+                          borderBottom: "1px solid #333",
+                          transition: "background-color 0.2s ease",
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = "#333";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = "transparent";
+                        }}
+                      >
+                        <div style={{ color: "#fff", fontWeight: 600 }}>{site.address}</div>
+                        {site.manager && (
+                          <div style={{ color: "#94a3b8", fontSize: "0.85rem" }}>{site.manager}</div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
               <div>
                 <label style={{ display: "block", color: "#94a3b8", marginBottom: "0.5rem", fontSize: "0.9rem" }}>
