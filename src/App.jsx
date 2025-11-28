@@ -142,6 +142,7 @@ const DEFAULT_SITE_NAMES = [
   "1019 Market",
    "Sutro Tower",
   "425 Market",
+  "146 Geary",
   "A.Shaef Breaks (717M, 240S, 115S)",
   "A.Hayes Breaks (425C, 101M, 153K, 150P)",
   "Y.Perez Breaks (71S, 1019M, 90NM, 30G)",
@@ -6393,14 +6394,69 @@ const OpsDataModal = ({ weekData, onClose, startDate, endDate, onBack }) => {
             </div>
 
             {/* Chart */}
-            <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
-              {busyHoursData.map((dayData, index) => {
-                const maxHours = Math.max(dayData.grave, dayData.dayShift, dayData.swing, 1);
-                const barHeight = 200; // Fixed height for bars
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+              {/* Day Headers */}
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "1rem",
+                }}
+              >
+                <div
+                  style={{
+                    minWidth: "100px",
+                    fontSize: "0.95rem",
+                    fontWeight: 600,
+                    color: "#f8fafc",
+                  }}
+                >
+                  Shift
+                </div>
+                <div
+                  style={{
+                    flex: 1,
+                    display: "grid",
+                    gridTemplateColumns: "repeat(7, 1fr)",
+                    gap: "2rem",
+                  }}
+                >
+                  {busyHoursData.map((dayData, index) => (
+                    <div
+                      key={index}
+                      style={{
+                        fontSize: "0.95rem",
+                        fontWeight: 600,
+                        color: "#f8fafc",
+                        textAlign: "center",
+                      }}
+                    >
+                      {dayData.dayName}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Shift Rows */}
+              {[
+                { name: "Grave", key: "graves", color: "#FFFFFF", borderColor: "rgba(255, 255, 255, 0.8)", label: "Grave (0000-0800)" },
+                { name: "Day", key: "dayShifts", color: "#22c55e", borderColor: "rgba(34, 197, 94, 0.6)", label: "Day (0800-1600)" },
+                { name: "Swing", key: "swings", color: "#3b82f6", borderColor: "rgba(59, 130, 246, 0.6)", label: "Swing (1600-0000)" },
+              ].map((shift, shiftIndex) => {
+                // Calculate max hours for this shift across all days
+                const maxHours = Math.max(
+                  ...busyHoursData.map(dayData => 
+                    shift.name === "Grave" ? dayData.grave : 
+                    shift.name === "Day" ? dayData.dayShift : 
+                    dayData.swing
+                  ),
+                  1
+                );
+                const barHeight = 150; // Reduced height for more compact vertical spacing
                 
                 return (
                   <div
-                    key={index}
+                    key={shiftIndex}
                     style={{
                       display: "flex",
                       alignItems: "center",
@@ -6415,157 +6471,61 @@ const OpsDataModal = ({ weekData, onClose, startDate, endDate, onBack }) => {
                         color: "#f8fafc",
                       }}
                     >
-                      {dayData.dayName}
+                      {shift.name}
                     </div>
                     <div
                       style={{
                         flex: 1,
-                        display: "flex",
-                        gap: "0.5rem",
+                        display: "grid",
+                        gridTemplateColumns: "repeat(7, 1fr)",
+                        gap: "2rem",
                         alignItems: "flex-end",
                         height: `${barHeight}px`,
                       }}
                     >
-                      {/* Grave Bar */}
-                      <div
-                        style={{
-                          flex: 1,
-                          display: "flex",
-                          flexDirection: "column",
-                          alignItems: "center",
-                          gap: "0.25rem",
-                          height: `${barHeight}px`,
-                          justifyContent: "flex-end",
-                        }}
-                      >
-                        {dayData.grave > 0 && (
-                          <span
+                      {busyHoursData.map((dayData, dayIndex) => {
+                        const hours = shift.name === "Grave" ? dayData.grave : 
+                                     shift.name === "Day" ? dayData.dayShift : 
+                                     dayData.swing;
+                        
+                        return (
+                          <div
+                            key={dayIndex}
                             style={{
-                              fontSize: "0.75rem",
-                              color: "#f8fafc",
-                              fontWeight: 600,
-                              marginBottom: "0.25rem",
+                              display: "flex",
+                              flexDirection: "column",
+                              alignItems: "center",
+                              gap: "0.15rem",
+                              height: `${barHeight}px`,
+                              justifyContent: "flex-end",
                             }}
                           >
-                            {dayData.grave.toFixed(1)}h
-                          </span>
-                        )}
-                        <div
-                          style={{
-                            width: "100%",
-                            height: `${(dayData.grave / maxHours) * barHeight}px`,
-                            backgroundColor: "#FFFFFF",
-                            borderRadius: "0.375rem 0.375rem 0 0",
-                            border: "2px solid rgba(255, 255, 255, 0.8)",
-                            transition: "height 0.5s ease",
-                            minHeight: dayData.grave > 0 ? "4px" : "0",
-                          }}
-                        />
-                        <span
-                          style={{
-                            fontSize: "0.75rem",
-                            color: "#94a3b8",
-                            fontWeight: 500,
-                            marginTop: "0.25rem",
-                          }}
-                        >
-                          Grave
-                        </span>
-                      </div>
-
-                      {/* Day Bar */}
-                      <div
-                        style={{
-                          flex: 1,
-                          display: "flex",
-                          flexDirection: "column",
-                          alignItems: "center",
-                          gap: "0.25rem",
-                          height: `${barHeight}px`,
-                          justifyContent: "flex-end",
-                        }}
-                      >
-                        {dayData.dayShift > 0 && (
-                          <span
-                            style={{
-                              fontSize: "0.75rem",
-                              color: "#f8fafc",
-                              fontWeight: 600,
-                              marginBottom: "0.25rem",
-                            }}
-                          >
-                            {dayData.dayShift.toFixed(1)}h
-                          </span>
-                        )}
-                        <div
-                          style={{
-                            width: "100%",
-                            height: `${(dayData.dayShift / maxHours) * barHeight}px`,
-                            backgroundColor: "#22c55e",
-                            borderRadius: "0.375rem 0.375rem 0 0",
-                            border: "2px solid rgba(34, 197, 94, 0.6)",
-                            transition: "height 0.5s ease",
-                            minHeight: dayData.dayShift > 0 ? "4px" : "0",
-                          }}
-                        />
-                        <span
-                          style={{
-                            fontSize: "0.75rem",
-                            color: "#94a3b8",
-                            fontWeight: 500,
-                            marginTop: "0.25rem",
-                          }}
-                        >
-                          Day
-                        </span>
-                      </div>
-
-                      {/* Swing Bar */}
-                      <div
-                        style={{
-                          flex: 1,
-                          display: "flex",
-                          flexDirection: "column",
-                          alignItems: "center",
-                          gap: "0.25rem",
-                          height: `${barHeight}px`,
-                          justifyContent: "flex-end",
-                        }}
-                      >
-                        {dayData.swing > 0 && (
-                          <span
-                            style={{
-                              fontSize: "0.75rem",
-                              color: "#f8fafc",
-                              fontWeight: 600,
-                              marginBottom: "0.25rem",
-                            }}
-                          >
-                            {dayData.swing.toFixed(1)}h
-                          </span>
-                        )}
-                        <div
-                          style={{
-                            width: "100%",
-                            height: `${(dayData.swing / maxHours) * barHeight}px`,
-                            backgroundColor: "#3b82f6",
-                            borderRadius: "0.375rem 0.375rem 0 0",
-                            border: "2px solid rgba(59, 130, 246, 0.6)",
-                            transition: "height 0.5s ease",
-                            minHeight: dayData.swing > 0 ? "4px" : "0",
-                          }}
-                        />
-                        <span
-                          style={{
-                            fontSize: "0.75rem",
-                            color: "#94a3b8",
-                            fontWeight: 500,
-                            marginTop: "0.25rem",
-                          }}
-                        >
-                          Swing
-                        </span>
-                      </div>
+                            {hours > 0 && (
+                              <span
+                                style={{
+                                  fontSize: "0.7rem",
+                                  color: "#f8fafc",
+                                  fontWeight: 600,
+                                  marginBottom: "0.15rem",
+                                }}
+                              >
+                                {hours.toFixed(1)}h
+                              </span>
+                            )}
+                            <div
+                              style={{
+                                width: "100%",
+                                height: `${(hours / maxHours) * barHeight}px`,
+                                backgroundColor: shift.color,
+                                borderRadius: "0.375rem 0.375rem 0 0",
+                                border: `2px solid ${shift.borderColor}`,
+                                transition: "height 0.5s ease",
+                                minHeight: hours > 0 ? "4px" : "0",
+                              }}
+                            />
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 );
@@ -6859,18 +6819,29 @@ const SiteSearchModal = ({ onClose, hasAccess, db, initialSelectedSite = null })
 
   // Filter address suggestions for edit modal
   useEffect(() => {
-    if (!formData.address.trim() || !showEditModal) {
+    if (!showEditModal) {
       setAddressSuggestions([]);
       setShowAddressSuggestions(false);
       return;
     }
 
-    const query = formData.address.toLowerCase();
+    if (!formData.address.trim()) {
+      setAddressSuggestions([]);
+      setShowAddressSuggestions(false);
+      return;
+    }
+
+    const query = formData.address.toLowerCase().trim();
     const matches = sites
-      .filter((site) => site.address?.toLowerCase().includes(query))
+      .filter((site) => {
+        if (!site.address) return false;
+        const addressLower = site.address.toLowerCase();
+        return addressLower.includes(query);
+      })
       .slice(0, 5); // Limit to 5 suggestions
+    
     setAddressSuggestions(matches);
-    setShowAddressSuggestions(matches.length > 0);
+    setShowAddressSuggestions(matches.length > 0 && formData.address.trim().length > 0);
   }, [formData.address, sites, showEditModal]);
 
   const handleSelectSite = (site) => {
@@ -7210,8 +7181,17 @@ const SiteSearchModal = ({ onClose, hasAccess, db, initialSelectedSite = null })
                     setShowAddressSuggestions(true);
                   }}
                   onFocus={() => {
-                    if (addressSuggestions.length > 0) {
-                      setShowAddressSuggestions(true);
+                    // Recalculate suggestions on focus
+                    const query = formData.address.toLowerCase().trim();
+                    if (query.length > 0) {
+                      const matches = sites
+                        .filter((site) => {
+                          if (!site.address) return false;
+                          return site.address.toLowerCase().includes(query);
+                        })
+                        .slice(0, 5);
+                      setAddressSuggestions(matches);
+                      setShowAddressSuggestions(matches.length > 0);
                     }
                   }}
                   onBlur={() => {
