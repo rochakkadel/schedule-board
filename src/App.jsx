@@ -1159,7 +1159,7 @@ const Header = ({
               e.currentTarget.style.transform = "none";
             }}
           >
-            Summary
+            DATA
           </button>
         )}
       </div>
@@ -4065,7 +4065,319 @@ const DayNotesModal = ({
 /**
  * Summary Modal Component
  */
-const SummaryModal = ({ weekData, onClose, isAdmin, weekId, onOpenDetails, onOpenManagerData, onOpenOpsData }) => {
+const SummaryModal = ({ weekData, onClose, isAdmin, weekId, onOpenDetails, onOpenManagerData, onOpenOpsData, db, collectionPath, initialStartDate, initialEndDate, initialFilteredData }) => {
+  // Date filtering state - separate input state from active filter state
+  const [startDateInput, setStartDateInput] = useState(initialStartDate || '');
+  const [endDateInput, setEndDateInput] = useState(initialEndDate || '');
+  const [activeStartDate, setActiveStartDate] = useState(initialStartDate || '');
+  const [activeEndDate, setActiveEndDate] = useState(initialEndDate || '');
+  const [aggregatedData, setAggregatedData] = useState(initialFilteredData || { days: [] });
+  const [isLoading, setIsLoading] = useState(false);
+
+  // Initialize with provided state if available
+  useEffect(() => {
+    if (initialStartDate && initialEndDate && initialFilteredData) {
+      setStartDateInput(initialStartDate);
+      setEndDateInput(initialEndDate);
+      setActiveStartDate(initialStartDate);
+      setActiveEndDate(initialEndDate);
+      setAggregatedData(initialFilteredData);
+    }
+  }, [initialStartDate, initialEndDate, initialFilteredData]);
+
+  // Helper function to format date for input (YYYY-MM-DD)
+  const formatDateForInput = (date) => {
+    if (!date) return '';
+    const d = date instanceof Date ? date : new Date(date);
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  // Helper function to get date without time for comparison
+  const getDateOnly = (date) => {
+    if (!date) return null;
+    const d = date instanceof Date ? date : new Date(date);
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  };
+
+  // Get all week IDs between start and end dates
+  const getWeekIdsInRange = (startDate, endDate) => {
+    if (!startDate && !endDate) return [];
+    
+    const start = startDate ? new Date(startDate + 'T00:00:00') : new Date(0);
+    const end = endDate ? new Date(endDate + 'T23:59:59') : new Date();
+    
+    const weekIds = new Set();
+    const currentDate = new Date(start);
+    
+    // Go through each day in the range to ensure we get all weeks
+    while (currentDate <= end) {
+      const weekId = getWeekId(currentDate);
+      weekIds.add(weekId);
+      currentDate.setDate(currentDate.getDate() + 1); // Move to next day
+    }
+    
+    return Array.from(weekIds);
+  };
+
+  // Load data from multiple weeks
+  const loadDataFromWeeks = async (startDate, endDate) => {
+    if (!db || !collectionPath) {
+      // Fallback to current weekData if db not available
+      return weekData || { days: [] };
+    }
+
+    setIsLoading(true);
+    try {
+      const weekIds = getWeekIdsInRange(startDate, endDate);
+      const allDays = [];
+
+      // Load data from each week
+      for (const weekId of weekIds) {
+        try {
+          const weekDocRef = doc(db, collectionPath, weekId);
+          const weekDoc = await getDoc(weekDocRef);
+          
+          if (weekDoc.exists()) {
+            const data = weekDoc.data();
+            if (data.days && Array.isArray(data.days)) {
+              // Convert date strings to Date objects
+              const daysWithDates = data.days.map(day => {
+                let dayDate;
+                let dateString;
+                
+                // Firebase stores date as a string in "YYYY-MM-DD" format in the 'date' field
+                // The dateString field might also exist
+                if (day.date) {
+                  if (typeof day.date === 'string') {
+                    // date is stored as string like "2025-01-15"
+                    // Parse it properly to avoid timezone issues
+                    const dateParts = day.date.split('-');
+                    if (dateParts.length === 3) {
+                      dayDate = new Date(parseInt(dateParts[0]), parseInt(dateParts[1]) - 1, parseInt(dateParts[2]));
+                      dateString = day.date;
+                    } else {
+                      dayDate = new Date(day.date + 'T00:00:00');
+                      dateString = day.date.includes('T') ? day.date.split('T')[0] : day.date;
+                    }
+                  } else if (day.date instanceof Date) {
+                    dayDate = day.date;
+                    dateString = formatDateForInput(dayDate);
+                  } else {
+                    return null;
+                  }
+                } else if (day.dateString) {
+                  // Use dateString if date field doesn't exist
+                  const dateParts = day.dateString.split('-');
+                  if (dateParts.length === 3) {
+                    dayDate = new Date(parseInt(dateParts[0]), parseInt(dateParts[1]) - 1, parseInt(dateParts[2]));
+                    dateString = day.dateString;
+                  } else {
+                    dayDate = new Date(day.dateString + 'T00:00:00');
+                    dateString = day.dateString.includes('T') ? day.dateString.split('T')[0] : day.dateString;
+                  }
+                } else {
+                  return null;
+                }
+                
+                // Ensure date is valid
+                if (isNaN(dayDate.getTime())) {
+                  return null;
+                }
+                
+                return {
+                  ...day,
+                  date: dayDate,
+                  dateString: dateString || formatDateForInput(dayDate)
+                };
+              }).filter(day => day !== null);
+              
+              allDays.push(...daysWithDates);
+            }
+          }
+        } catch (error) {
+          console.error(`Error loading week ${weekId}:`, error);
+        }
+      }
+
+      // Remove duplicate days (same dateString) - keep the one with more shifts
+      const daysMap = new Map();
+      allDays.forEach(day => {
+        const dateKey = day.dateString || formatDateForInput(day.date);
+        if (!daysMap.has(dateKey)) {
+          daysMap.set(dateKey, day);
+        } else {
+          // If duplicate, keep the one with more shifts
+          const existing = daysMap.get(dateKey);
+          const existingShifts = existing.shifts ? existing.shifts.length : 0;
+          const newShifts = day.shifts ? day.shifts.length : 0;
+          if (newShifts > existingShifts) {
+            daysMap.set(dateKey, day);
+          }
+        }
+      });
+
+      // Filter days by date range - compare dates at midnight to avoid timezone issues
+      const filteredDays = Array.from(daysMap.values()).filter(day => {
+        if (!day.date) return false;
+        
+        const dayDate = getDateOnly(day.date);
+        if (!dayDate || isNaN(dayDate.getTime())) return false;
+
+        let start = null;
+        let end = null;
+        
+        if (startDate) {
+          const startDateObj = new Date(startDate + 'T00:00:00');
+          start = getDateOnly(startDateObj);
+        }
+        
+        if (endDate) {
+          const endDateObj = new Date(endDate + 'T23:59:59');
+          end = getDateOnly(endDateObj);
+        }
+
+        // If only start date is set, include days >= start
+        if (start && !end) {
+          return dayDate.getTime() >= start.getTime();
+        }
+        // If only end date is set, include days <= end
+        if (!start && end) {
+          return dayDate.getTime() <= end.getTime();
+        }
+        // If both are set, include days between start and end (inclusive)
+        if (start && end) {
+          return dayDate.getTime() >= start.getTime() && dayDate.getTime() <= end.getTime();
+        }
+
+        return true;
+      });
+
+      return { days: filteredDays };
+    } catch (error) {
+      console.error("Error loading data from weeks:", error);
+      return weekData || { days: [] };
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Handle search button click
+  const handleSearch = async () => {
+    setActiveStartDate(startDateInput);
+    setActiveEndDate(endDateInput);
+    
+    // Load data from all weeks in the date range
+    const aggregated = await loadDataFromWeeks(startDateInput, endDateInput);
+    setAggregatedData(aggregated);
+  };
+
+  // Use aggregated data if date filter is active, otherwise use current weekData
+  const filteredWeekData = useMemo(() => {
+    // If no active date filter is set, return current weekData
+    if (!activeStartDate && !activeEndDate) {
+      // Reset aggregated data when no filter is active
+      if (aggregatedData.days.length > 0) {
+        setAggregatedData({ days: [] });
+      }
+      return weekData || { days: [] };
+    }
+
+    // Use aggregated data if available and filter is active
+    if (aggregatedData && aggregatedData.days && aggregatedData.days.length >= 0) {
+      return aggregatedData;
+    }
+
+    // Fallback: filter current weekData (shouldn't happen if search was clicked)
+    if (!weekData || !weekData.days) {
+      return { days: [] };
+    }
+
+    const filteredDays = weekData.days.filter(day => {
+      if (!day.date) return false;
+      
+      const dayDate = getDateOnly(day.date);
+      if (!dayDate || isNaN(dayDate.getTime())) return false;
+
+      let start = null;
+      let end = null;
+      
+      if (activeStartDate) {
+        const startDateObj = new Date(activeStartDate + 'T00:00:00');
+        start = getDateOnly(startDateObj);
+      }
+      
+      if (activeEndDate) {
+        const endDateObj = new Date(activeEndDate + 'T23:59:59');
+        end = getDateOnly(endDateObj);
+      }
+
+      if (start && !end) {
+        return dayDate.getTime() >= start.getTime();
+      }
+      if (!start && end) {
+        return dayDate.getTime() <= end.getTime();
+      }
+      if (start && end) {
+        return dayDate.getTime() >= start.getTime() && dayDate.getTime() <= end.getTime();
+      }
+
+      return true;
+    });
+
+    return { days: filteredDays };
+  }, [weekData, activeStartDate, activeEndDate, aggregatedData]);
+
+  // Shortcut button handlers - set input dates and trigger search
+  const handleYTD = async () => {
+    const today = new Date();
+    const yearStart = new Date(today.getFullYear(), 0, 1);
+    const startStr = formatDateForInput(yearStart);
+    const endStr = formatDateForInput(today);
+    setStartDateInput(startStr);
+    setEndDateInput(endStr);
+    setActiveStartDate(startStr);
+    setActiveEndDate(endStr);
+    
+    // Load data from all weeks
+    const aggregated = await loadDataFromWeeks(startStr, endStr);
+    setAggregatedData(aggregated);
+  };
+
+  const handleWTD = async () => {
+    const today = new Date();
+    const weekStart = new Date(today);
+    const dayOfWeek = weekStart.getDay();
+    weekStart.setDate(weekStart.getDate() - dayOfWeek); // Go to Sunday
+    const startStr = formatDateForInput(weekStart);
+    const endStr = formatDateForInput(today);
+    setStartDateInput(startStr);
+    setEndDateInput(endStr);
+    setActiveStartDate(startStr);
+    setActiveEndDate(endStr);
+    
+    // Load data from all weeks
+    const aggregated = await loadDataFromWeeks(startStr, endStr);
+    setAggregatedData(aggregated);
+  };
+
+  const handleMTD = async () => {
+    const today = new Date();
+    const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+    const startStr = formatDateForInput(monthStart);
+    const endStr = formatDateForInput(today);
+    setStartDateInput(startStr);
+    setEndDateInput(endStr);
+    setActiveStartDate(startStr);
+    setActiveEndDate(endStr);
+    
+    // Load data from all weeks
+    const aggregated = await loadDataFromWeeks(startStr, endStr);
+    setAggregatedData(aggregated);
+  };
+
   // Calculate hours from time string (e.g., "0800", "1600")
   const timeToHours = (timeStr) => {
     if (!timeStr || typeof timeStr !== 'string') return null;
@@ -4116,17 +4428,17 @@ const SummaryModal = ({ weekData, onClose, isAdmin, weekId, onOpenDetails, onOpe
     return hours;
   };
 
-  // Calculate statistics
+  // Calculate statistics using filtered data
   const stats = useMemo(() => {
     let totalHours = 0;
     let opsHours = 0;
     let noCoverageHours = 0;
 
-    if (!weekData || !weekData.days) {
+    if (!filteredWeekData || !filteredWeekData.days) {
       return { totalHours: 0, opsHours: 0, noCoverageHours: 0 };
     }
 
-    weekData.days.forEach(day => {
+    filteredWeekData.days.forEach(day => {
       if (!day.shifts || !Array.isArray(day.shifts)) return;
 
       day.shifts.forEach(shift => {
@@ -4161,7 +4473,7 @@ const SummaryModal = ({ weekData, onClose, isAdmin, weekId, onOpenDetails, onOpe
     });
 
     return { totalHours, opsHours, noCoverageHours };
-  }, [weekData]);
+  }, [filteredWeekData]);
 
   const maxHours = Math.max(stats.totalHours, stats.opsHours, stats.noCoverageHours, 1);
   const barContainerHeight = 250; // Fixed height in pixels
@@ -4194,6 +4506,237 @@ const SummaryModal = ({ weekData, onClose, isAdmin, weekId, onOpenDetails, onOpe
           >
 
           </p>
+        </div>
+
+        {/* Date Filter Section */}
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: "1rem",
+            padding: "1.25rem",
+            backgroundColor: "rgba(15, 23, 42, 0.6)",
+            borderRadius: "0.75rem",
+            border: "1px solid rgba(148, 163, 184, 0.18)",
+          }}
+        >
+          {isLoading && (
+            <div style={{ 
+              padding: "0.5rem", 
+              textAlign: "center", 
+              color: "#60a5fa",
+              fontSize: "0.9rem",
+              fontWeight: 600
+            }}>
+              Loading data from multiple weeks...
+            </div>
+          )}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "1rem",
+              flexWrap: "wrap",
+            }}
+          >
+            <label
+              style={{
+                fontSize: "0.95rem",
+                fontWeight: 600,
+                color: "#f8fafc",
+                minWidth: "80px",
+              }}
+            >
+              Start Date:
+            </label>
+            <input
+              type="date"
+              value={startDateInput}
+              onChange={(e) => setStartDateInput(e.target.value)}
+              style={{
+                padding: "0.5rem 0.75rem",
+                backgroundColor: "rgba(0, 0, 0, 0.3)",
+                border: "1px solid rgba(148, 163, 184, 0.35)",
+                borderRadius: "0.5rem",
+                color: "#f8fafc",
+                fontSize: "0.95rem",
+                cursor: "pointer",
+              }}
+            />
+            <label
+              style={{
+                fontSize: "0.95rem",
+                fontWeight: 600,
+                color: "#f8fafc",
+                minWidth: "80px",
+              }}
+            >
+              End Date:
+            </label>
+            <input
+              type="date"
+              value={endDateInput}
+              onChange={(e) => setEndDateInput(e.target.value)}
+              style={{
+                padding: "0.5rem 0.75rem",
+                backgroundColor: "rgba(0, 0, 0, 0.3)",
+                border: "1px solid rgba(148, 163, 184, 0.35)",
+                borderRadius: "0.5rem",
+                color: "#f8fafc",
+                fontSize: "0.95rem",
+                cursor: "pointer",
+              }}
+            />
+            <button
+              type="button"
+              onClick={handleSearch}
+              style={{
+                padding: "0.5rem 1.25rem",
+                backgroundColor: "rgba(34, 197, 94, 0.2)",
+                border: "1px solid rgba(34, 197, 94, 0.5)",
+                borderRadius: "0.5rem",
+                color: "#4ade80",
+                fontSize: "0.95rem",
+                fontWeight: 600,
+                cursor: "pointer",
+                transition: "all 0.2s ease",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = "rgba(34, 197, 94, 0.3)";
+                e.currentTarget.style.border = "1px solid rgba(34, 197, 94, 0.7)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = "rgba(34, 197, 94, 0.2)";
+                e.currentTarget.style.border = "1px solid rgba(34, 197, 94, 0.5)";
+              }}
+            >
+              Search
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setStartDateInput('');
+                setEndDateInput('');
+                setActiveStartDate('');
+                setActiveEndDate('');
+                setAggregatedData({ days: [] });
+              }}
+              style={{
+                padding: "0.5rem 1rem",
+                backgroundColor: "rgba(148, 163, 184, 0.15)",
+                border: "1px solid rgba(148, 163, 184, 0.35)",
+                borderRadius: "0.5rem",
+                color: "#e2e8f0",
+                fontSize: "0.9rem",
+                fontWeight: 600,
+                cursor: "pointer",
+                transition: "all 0.2s ease",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = "rgba(148, 163, 184, 0.25)";
+                e.currentTarget.style.border = "1px solid rgba(148, 163, 184, 0.55)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = "rgba(148, 163, 184, 0.15)";
+                e.currentTarget.style.border = "1px solid rgba(148, 163, 184, 0.35)";
+              }}
+            >
+              Clear
+            </button>
+          </div>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "0.75rem",
+              flexWrap: "wrap",
+            }}
+          >
+            <span
+              style={{
+                fontSize: "0.9rem",
+                fontWeight: 600,
+                color: "#94a3b8",
+              }}
+            >
+              Quick Filters:
+            </span>
+            <button
+              type="button"
+              onClick={handleYTD}
+              style={{
+                padding: "0.5rem 1rem",
+                backgroundColor: "rgba(59, 130, 246, 0.15)",
+                border: "1px solid rgba(59, 130, 246, 0.45)",
+                borderRadius: "0.5rem",
+                color: "#60a5fa",
+                fontSize: "0.9rem",
+                fontWeight: 600,
+                cursor: "pointer",
+                transition: "all 0.2s ease",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = "rgba(59, 130, 246, 0.25)";
+                e.currentTarget.style.border = "1px solid rgba(59, 130, 246, 0.65)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = "rgba(59, 130, 246, 0.15)";
+                e.currentTarget.style.border = "1px solid rgba(59, 130, 246, 0.45)";
+              }}
+            >
+              YTD
+            </button>
+            <button
+              type="button"
+              onClick={handleWTD}
+              style={{
+                padding: "0.5rem 1rem",
+                backgroundColor: "rgba(59, 130, 246, 0.15)",
+                border: "1px solid rgba(59, 130, 246, 0.45)",
+                borderRadius: "0.5rem",
+                color: "#60a5fa",
+                fontSize: "0.9rem",
+                fontWeight: 600,
+                cursor: "pointer",
+                transition: "all 0.2s ease",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = "rgba(59, 130, 246, 0.25)";
+                e.currentTarget.style.border = "1px solid rgba(59, 130, 246, 0.65)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = "rgba(59, 130, 246, 0.15)";
+                e.currentTarget.style.border = "1px solid rgba(59, 130, 246, 0.45)";
+              }}
+            >
+              WTD
+            </button>
+            <button
+              type="button"
+              onClick={handleMTD}
+              style={{
+                padding: "0.5rem 1rem",
+                backgroundColor: "rgba(59, 130, 246, 0.15)",
+                border: "1px solid rgba(59, 130, 246, 0.45)",
+                borderRadius: "0.5rem",
+                color: "#60a5fa",
+                fontSize: "0.9rem",
+                fontWeight: 600,
+                cursor: "pointer",
+                transition: "all 0.2s ease",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = "rgba(59, 130, 246, 0.25)";
+                e.currentTarget.style.border = "1px solid rgba(59, 130, 246, 0.65)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = "rgba(59, 130, 246, 0.15)";
+                e.currentTarget.style.border = "1px solid rgba(59, 130, 246, 0.45)";
+              }}
+            >
+              MTD
+            </button>
+          </div>
         </div>
 
         <div style={{ display: "flex", gap: "2rem", alignItems: "flex-start" }}>
@@ -4323,7 +4866,7 @@ const SummaryModal = ({ weekData, onClose, isAdmin, weekId, onOpenDetails, onOpe
             {isAdmin && onOpenDetails && (
               <button
                 type="button"
-                onClick={onOpenDetails}
+                onClick={() => onOpenDetails(activeStartDate, activeEndDate, filteredWeekData)}
                 style={{
                   padding: "0.5rem 1rem",
                   backgroundColor: "rgba(59, 130, 246, 0.15)",
@@ -4350,7 +4893,7 @@ const SummaryModal = ({ weekData, onClose, isAdmin, weekId, onOpenDetails, onOpe
             {isAdmin && onOpenManagerData && (
               <button
                 type="button"
-                onClick={onOpenManagerData}
+                onClick={() => onOpenManagerData(activeStartDate, activeEndDate, filteredWeekData)}
                 style={{
                   padding: "0.5rem 1rem",
                   backgroundColor: "rgba(139, 92, 246, 0.15)",
@@ -4377,7 +4920,7 @@ const SummaryModal = ({ weekData, onClose, isAdmin, weekId, onOpenDetails, onOpe
             {isAdmin && onOpenOpsData && (
               <button
                 type="button"
-                onClick={onOpenOpsData}
+                onClick={() => onOpenOpsData(activeStartDate, activeEndDate, filteredWeekData)}
                 style={{
                   padding: "0.5rem 1rem",
                   backgroundColor: "rgba(59, 130, 246, 0.15)",
@@ -4428,7 +4971,51 @@ const SummaryModal = ({ weekData, onClose, isAdmin, weekId, onOpenDetails, onOpe
 /**
  * Detailed Summary Modal Component
  */
-const DetailedSummaryModal = ({ weekData, onClose }) => {
+const DetailedSummaryModal = ({ weekData, onClose, startDate, endDate, onBack }) => {
+  // Helper function to get date without time for comparison
+  const getDateOnly = (date) => {
+    if (!date) return null;
+    const d = date instanceof Date ? date : new Date(date);
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  };
+
+  // Filter weekData based on date range
+  const filteredWeekData = useMemo(() => {
+    if (!weekData || !weekData.days) {
+      return { days: [] };
+    }
+
+    // If no date filter is set, return all data
+    if (!startDate && !endDate) {
+      return weekData;
+    }
+
+    const filteredDays = weekData.days.filter(day => {
+      const dayDate = getDateOnly(day.date);
+      if (!dayDate) return false;
+
+      const start = startDate ? getDateOnly(new Date(startDate)) : null;
+      const end = endDate ? getDateOnly(new Date(endDate)) : null;
+
+      // If only start date is set, include days >= start
+      if (start && !end) {
+        return dayDate >= start;
+      }
+      // If only end date is set, include days <= end
+      if (!start && end) {
+        return dayDate <= end;
+      }
+      // If both are set, include days between start and end (inclusive)
+      if (start && end) {
+        return dayDate >= start && dayDate <= end;
+      }
+
+      return true;
+    });
+
+    return { days: filteredDays };
+  }, [weekData, startDate, endDate]);
+
   // Calculate hours from time string (e.g., "0800", "1600")
   const timeToHours = (timeStr) => {
     if (!timeStr || typeof timeStr !== 'string') return null;
@@ -4479,16 +5066,16 @@ const DetailedSummaryModal = ({ weekData, onClose }) => {
     return hours;
   };
 
-  // Calculate top sites statistics
+  // Calculate top sites statistics using filtered data
   const siteStats = useMemo(() => {
     const allShiftsBySite = {}; // All shifts by site (all colors) - total coverage needed
     const opsShiftsBySite = {}; // OPS shifts by site (blue background only)
 
-    if (!weekData || !weekData.days) {
+    if (!filteredWeekData || !filteredWeekData.days) {
       return { coverageNeeded: [], opsNeeded: [] };
     }
 
-    weekData.days.forEach(day => {
+    filteredWeekData.days.forEach(day => {
       if (!day.shifts || !Array.isArray(day.shifts)) return;
 
       day.shifts.forEach(shift => {
@@ -4555,7 +5142,7 @@ const DetailedSummaryModal = ({ weekData, onClose }) => {
       .slice(0, 10);
 
     return { coverageNeeded: coverageNeededArray, opsNeeded: opsNeededArray };
-  }, [weekData]);
+  }, [filteredWeekData]);
 
   return (
     <Modal onClose={onClose}>
@@ -4752,7 +5339,38 @@ const DetailedSummaryModal = ({ weekData, onClose }) => {
           </div>
         </div>
 
-        <div style={{ display: "flex", justifyContent: "flex-end" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          {onBack && (
+            <button
+              type="button"
+              onClick={onBack}
+              style={{
+                padding: "0.6rem 1.2rem",
+                backgroundColor: "rgba(59, 130, 246, 0.15)",
+                border: "1px solid rgba(59, 130, 246, 0.45)",
+                borderRadius: "0.5rem",
+                color: "#60a5fa",
+                fontSize: "0.95rem",
+                fontWeight: 600,
+                cursor: "pointer",
+                transition: "all 0.2s ease",
+                display: "flex",
+                alignItems: "center",
+                gap: "0.5rem",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = "rgba(59, 130, 246, 0.25)";
+                e.currentTarget.style.border = "1px solid rgba(59, 130, 246, 0.65)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = "rgba(59, 130, 246, 0.15)";
+                e.currentTarget.style.border = "1px solid rgba(59, 130, 246, 0.45)";
+              }}
+            >
+              <span>←</span> Back to Summary
+            </button>
+          )}
+          <div style={{ marginLeft: onBack ? "auto" : "0" }}>
           <button
             type="button"
             onClick={onClose}
@@ -4768,6 +5386,7 @@ const DetailedSummaryModal = ({ weekData, onClose }) => {
           >
             Close
           </button>
+          </div>
         </div>
       </div>
     </Modal>
@@ -4777,8 +5396,52 @@ const DetailedSummaryModal = ({ weekData, onClose }) => {
 /**
  * Manager Data Modal Component
  */
-const ManagerDataModal = ({ weekData, onClose, db }) => {
+const ManagerDataModal = ({ weekData, onClose, db, startDate, endDate, onBack }) => {
   const [sites, setSites] = useState([]);
+
+  // Helper function to get date without time for comparison
+  const getDateOnly = (date) => {
+    if (!date) return null;
+    const d = date instanceof Date ? date : new Date(date);
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  };
+
+  // Filter weekData based on date range
+  const filteredWeekData = useMemo(() => {
+    if (!weekData || !weekData.days) {
+      return { days: [] };
+    }
+
+    // If no date filter is set, return all data
+    if (!startDate && !endDate) {
+      return weekData;
+    }
+
+    const filteredDays = weekData.days.filter(day => {
+      const dayDate = getDateOnly(day.date);
+      if (!dayDate) return false;
+
+      const start = startDate ? getDateOnly(new Date(startDate)) : null;
+      const end = endDate ? getDateOnly(new Date(endDate)) : null;
+
+      // If only start date is set, include days >= start
+      if (start && !end) {
+        return dayDate >= start;
+      }
+      // If only end date is set, include days <= end
+      if (!start && end) {
+        return dayDate <= end;
+      }
+      // If both are set, include days between start and end (inclusive)
+      if (start && end) {
+        return dayDate >= start && dayDate <= end;
+      }
+
+      return true;
+    });
+
+    return { days: filteredDays };
+  }, [weekData, startDate, endDate]);
 
   // Load sites from Firebase
   useEffect(() => {
@@ -4873,15 +5536,15 @@ const ManagerDataModal = ({ weekData, onClose, db }) => {
     return hours;
   };
 
-  // Calculate manager statistics
+  // Calculate manager statistics using filtered data
   const managerStats = useMemo(() => {
     const managerHours = {}; // { managerName: { totalHours: 0, opsHours: 0 } }
 
-    if (!weekData || !weekData.days || !sites.length) {
+    if (!filteredWeekData || !filteredWeekData.days || !sites.length) {
       return [];
     }
 
-    weekData.days.forEach(day => {
+    filteredWeekData.days.forEach(day => {
       if (!day.shifts || !Array.isArray(day.shifts)) return;
 
       day.shifts.forEach(shift => {
@@ -4947,18 +5610,25 @@ const ManagerDataModal = ({ weekData, onClose, db }) => {
         opsHours: stats.opsHours,
       }))
       .sort((a, b) => b.totalHours - a.totalHours);
-  }, [weekData, sites]);
+  }, [filteredWeekData, sites]);
 
-  // Calculate max hours for scaling
-  const maxHours = useMemo(() => {
+  // Calculate max hours for scaling - separate for total and OPS
+  const maxTotalHours = useMemo(() => {
     if (managerStats.length === 0) return 1;
-    return Math.max(
-      ...managerStats.map(m => Math.max(m.totalHours, m.opsHours)),
-      1
-    );
+    return Math.max(...managerStats.map(m => m.totalHours), 1);
   }, [managerStats]);
 
-  const barContainerHeight = 150; // Fixed height for bars
+  const maxOpsHours = useMemo(() => {
+    if (managerStats.length === 0) return 1;
+    return Math.max(...managerStats.map(m => m.opsHours), 1);
+  }, [managerStats]);
+
+  // Sort managers by OPS hours for OPS coverage section
+  const sortedByOps = useMemo(() => {
+    return [...managerStats].sort((a, b) => b.opsHours - a.opsHours);
+  }, [managerStats]);
+
+  const barContainerHeight = 200; // Fixed height for bars
 
   return (
     <Modal onClose={onClose}>
@@ -4988,98 +5658,74 @@ const ManagerDataModal = ({ weekData, onClose, db }) => {
         {managerStats.length > 0 ? (
           <div
             style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: "2rem",
+            }}
+          >
+            {/* Top Section: Total Coverage */}
+          <div
+            style={{
               backgroundColor: "rgba(15, 23, 42, 0.6)",
               borderRadius: "0.75rem",
               border: "1px solid rgba(148, 163, 184, 0.18)",
               padding: "1.5rem",
-              overflowX: "auto",
-            }}
-          >
-            <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-              {managerStats.map((item, index) => {
-                // Calculate bar heights based on maxHours
-                const totalBarHeight = maxHours > 0 && item.totalHours > 0 
-                  ? (item.totalHours / maxHours) * barContainerHeight 
-                  : 0;
-                const opsBarHeight = maxHours > 0 && item.opsHours > 0 
-                  ? (item.opsHours / maxHours) * barContainerHeight 
-                  : 0;
+              }}
+            >
+              <h4
+                style={{
+                  fontSize: "1.2rem",
+                  fontWeight: 700,
+                  color: "#f8fafc",
+                  marginBottom: "1.5rem",
+                }}
+              >
+                Total Coverage
+              </h4>
 
-                return (
-                  <div
-                    key={item.manager}
+              {/* Vertical Bar Chart - All Managers Compared */}
+              <div
                     style={{
                       display: "flex",
-                      gap: "2rem",
-                      padding: "0.75rem 1rem",
-                      backgroundColor: index % 2 === 0 ? "rgba(0, 0, 0, 0.3)" : "rgba(0, 0, 0, 0.1)",
-                      borderRadius: "0.5rem",
-                      border: "1px solid rgba(148, 163, 184, 0.1)",
-                      minHeight: `${barContainerHeight + 80}px`,
-                      alignItems: "flex-start",
-                    }}
-                  >
-                    {/* Left Side: Data */}
-                    <div style={{ 
-                      flex: "0 0 250px",
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: "0.5rem",
-                    }}>
-                      <div style={{ 
-                        fontSize: "1rem", 
-                        fontWeight: 600, 
-                        color: "#f8fafc",
-                        marginBottom: "0.5rem",
-                      }}>
-                        {item.manager}
-                      </div>
-                      <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-                        {item.totalHours > 0 && (
-                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                            <span style={{ fontSize: "0.9rem", color: "#94a3b8" }}>Total Coverage:</span>
-                            <span style={{ fontSize: "0.9rem", fontWeight: 700, color: "#22c55e" }}>
-                              {item.totalHours.toFixed(1)} hrs
-                            </span>
-                          </div>
-                        )}
-                        {item.opsHours > 0 && (
-                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                            <span style={{ fontSize: "0.9rem", color: "#94a3b8" }}>OPS Coverage:</span>
-                            <span style={{ fontSize: "0.9rem", fontWeight: 700, color: "#3b82f6" }}>
-                              {item.opsHours.toFixed(1)} hrs
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Right Side: Bar Charts */}
-                    <div style={{ 
-                      flex: 1,
-                      display: "flex", 
-                      gap: "2rem", 
+                  gap: "1rem",
                       alignItems: "flex-end", 
-                      minHeight: `${barContainerHeight + 60}px`,
-                      justifyContent: "flex-start",
-                    }}>
-                      {/* Total Coverage Bar */}
-                      <div style={{ 
+                  height: `${barContainerHeight + 80}px`,
+                  padding: "1rem",
+                  backgroundColor: "rgba(0, 0, 0, 0.2)",
+                      borderRadius: "0.5rem",
+                }}
+              >
+                {managerStats.map((item, index) => {
+                  const totalBarHeight = maxTotalHours > 0 && item.totalHours > 0 
+                    ? (item.totalHours / maxTotalHours) * barContainerHeight 
+                    : 0;
+
+                  return (
+                    <div
+                      key={`bar-total-${item.manager}`}
+                      style={{
+                      flex: 1,
                         display: "flex", 
                         flexDirection: "column", 
                         alignItems: "center", 
+                        gap: "0.5rem",
+                        height: `${barContainerHeight + 60}px`,
                         justifyContent: "flex-end",
-                        minWidth: "80px",
-                        height: `${barContainerHeight + 50}px`,
-                      }}>
-                        <div style={{
-                          width: "100%",
-                          height: `${barContainerHeight}px`,
-                          display: "flex",
-                          flexDirection: "column",
-                          justifyContent: "flex-end",
-                          position: "relative",
-                        }}>
+                      }}
+                    >
+                      {item.totalHours > 0 && (
+                        <span
+                          style={{
+                            fontSize: "0.75rem",
+                            color: "#f8fafc",
+                            fontWeight: 600,
+                            marginBottom: "0.25rem",
+                            textAlign: "center",
+                          }}
+                        >
+                          {item.totalHours.toFixed(1)}h
+                        </span>
+                      )}
                           <div
                             style={{
                               width: "100%",
@@ -5088,40 +5734,91 @@ const ManagerDataModal = ({ weekData, onClose, db }) => {
                               borderRadius: "0.375rem 0.375rem 0 0",
                               border: "2px solid rgba(34, 197, 94, 0.6)",
                               transition: "height 0.5s ease",
-                              display: item.totalHours > 0 ? "block" : "none",
-                            }}
-                          />
-                        </div>
-                        <span style={{ 
-                          fontSize: "0.85rem", 
+                          minHeight: item.totalHours > 0 ? "4px" : "0",
+                        }}
+                      />
+                      <span
+                        style={{
+                          fontSize: "0.75rem",
                           color: "#94a3b8", 
                           fontWeight: 500,
-                          marginTop: "0.5rem",
-                          height: "1.2rem",
-                          display: "flex",
-                          alignItems: "center",
-                        }}>
-                          Total
+                          marginTop: "0.25rem",
+                          textAlign: "center",
+                          wordBreak: "break-word",
+                          maxWidth: "100%",
+                        }}
+                      >
+                        {item.manager}
                         </span>
+                    </div>
+                  );
+                })}
+              </div>
                       </div>
 
-                      {/* OPS Coverage Bar */}
-                      <div style={{ 
+            {/* Bottom Section: OPS Coverage */}
+            <div
+              style={{
+                backgroundColor: "rgba(15, 23, 42, 0.6)",
+                borderRadius: "0.75rem",
+                border: "1px solid rgba(148, 163, 184, 0.18)",
+                padding: "1.5rem",
+              }}
+            >
+              <h4
+                style={{
+                  fontSize: "1.2rem",
+                  fontWeight: 700,
+                  color: "#f8fafc",
+                  marginBottom: "1.5rem",
+                }}
+              >
+                OPS Coverage
+              </h4>
+
+              {/* Vertical Bar Chart - All Managers Compared (Sorted by OPS Hours) */}
+              <div
+                style={{
+                  display: "flex",
+                  gap: "1rem",
+                  alignItems: "flex-end",
+                  height: `${barContainerHeight + 80}px`,
+                  padding: "1rem",
+                  backgroundColor: "rgba(0, 0, 0, 0.2)",
+                  borderRadius: "0.5rem",
+                }}
+              >
+                {sortedByOps.map((item, index) => {
+                  const opsBarHeight = maxOpsHours > 0 && item.opsHours > 0 
+                    ? (item.opsHours / maxOpsHours) * barContainerHeight 
+                    : 0;
+
+                  return (
+                    <div
+                      key={`bar-ops-${item.manager}`}
+                      style={{
+                        flex: 1,
                         display: "flex", 
                         flexDirection: "column", 
                         alignItems: "center", 
+                        gap: "0.5rem",
+                        height: `${barContainerHeight + 60}px`,
                         justifyContent: "flex-end",
-                        minWidth: "80px",
-                        height: `${barContainerHeight + 50}px`,
-                      }}>
-                        <div style={{
-                          width: "100%",
-                          height: `${barContainerHeight}px`,
-                          display: "flex",
-                          flexDirection: "column",
-                          justifyContent: "flex-end",
-                          position: "relative",
-                        }}>
+                      }}
+                    >
+                      {item.opsHours > 0 && (
+                        <span
+                          style={{
+                            fontSize: "0.75rem",
+                            color: "#f8fafc",
+                            fontWeight: 600,
+                            marginBottom: "0.25rem",
+                            textAlign: "center",
+                          }}
+                        >
+                          {item.opsHours.toFixed(1)}h
+                        </span>
+                      )}
                           <div
                             style={{
                               width: "100%",
@@ -5130,26 +5827,26 @@ const ManagerDataModal = ({ weekData, onClose, db }) => {
                               borderRadius: "0.375rem 0.375rem 0 0",
                               border: "2px solid rgba(59, 130, 246, 0.6)",
                               transition: "height 0.5s ease",
-                              display: item.opsHours > 0 ? "block" : "none",
-                            }}
-                          />
-                        </div>
-                        <span style={{ 
-                          fontSize: "0.85rem", 
+                          minHeight: item.opsHours > 0 ? "4px" : "0",
+                        }}
+                      />
+                      <span
+                        style={{
+                          fontSize: "0.75rem",
                           color: "#94a3b8", 
                           fontWeight: 500,
-                          marginTop: "0.5rem",
-                          height: "1.2rem",
-                          display: "flex",
-                          alignItems: "center",
-                        }}>
-                          OPS
+                          marginTop: "0.25rem",
+                          textAlign: "center",
+                          wordBreak: "break-word",
+                          maxWidth: "100%",
+                        }}
+                      >
+                        {item.manager}
                         </span>
-                      </div>
-                    </div>
                   </div>
                 );
               })}
+              </div>
             </div>
           </div>
         ) : (
@@ -5168,7 +5865,38 @@ const ManagerDataModal = ({ weekData, onClose, db }) => {
           </div>
         )}
 
-        <div style={{ display: "flex", justifyContent: "flex-end" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          {onBack && (
+            <button
+              type="button"
+              onClick={onBack}
+              style={{
+                padding: "0.6rem 1.2rem",
+                backgroundColor: "rgba(139, 92, 246, 0.15)",
+                border: "1px solid rgba(139, 92, 246, 0.45)",
+                borderRadius: "0.5rem",
+                color: "#a78bfa",
+                fontSize: "0.95rem",
+                fontWeight: 600,
+                cursor: "pointer",
+                transition: "all 0.2s ease",
+                display: "flex",
+                alignItems: "center",
+                gap: "0.5rem",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = "rgba(139, 92, 246, 0.25)";
+                e.currentTarget.style.border = "1px solid rgba(139, 92, 246, 0.65)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = "rgba(139, 92, 246, 0.15)";
+                e.currentTarget.style.border = "1px solid rgba(139, 92, 246, 0.45)";
+              }}
+            >
+              <span>←</span> Back to Summary
+            </button>
+          )}
+          <div style={{ marginLeft: onBack ? "auto" : "0" }}>
           <button
             type="button"
             onClick={onClose}
@@ -5194,6 +5922,7 @@ const ManagerDataModal = ({ weekData, onClose, db }) => {
           >
             Close
           </button>
+          </div>
         </div>
       </div>
     </Modal>
@@ -5203,7 +5932,53 @@ const ManagerDataModal = ({ weekData, onClose, db }) => {
 /**
  * Ops Data Modal Component
  */
-const OpsDataModal = ({ weekData, onClose }) => {
+const OpsDataModal = ({ weekData, onClose, startDate, endDate, onBack }) => {
+  const [showBusyHours, setShowBusyHours] = useState(false);
+
+  // Helper function to get date without time for comparison
+  const getDateOnly = (date) => {
+    if (!date) return null;
+    const d = date instanceof Date ? date : new Date(date);
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  };
+
+  // Filter weekData based on date range
+  const filteredWeekData = useMemo(() => {
+    if (!weekData || !weekData.days) {
+      return { days: [] };
+    }
+
+    // If no date filter is set, return all data
+    if (!startDate && !endDate) {
+      return weekData;
+    }
+
+    const filteredDays = weekData.days.filter(day => {
+      const dayDate = getDateOnly(day.date);
+      if (!dayDate) return false;
+
+      const start = startDate ? getDateOnly(new Date(startDate)) : null;
+      const end = endDate ? getDateOnly(new Date(endDate)) : null;
+
+      // If only start date is set, include days >= start
+      if (start && !end) {
+        return dayDate >= start;
+      }
+      // If only end date is set, include days <= end
+      if (!start && end) {
+        return dayDate <= end;
+      }
+      // If both are set, include days between start and end (inclusive)
+      if (start && end) {
+        return dayDate >= start && dayDate <= end;
+      }
+
+      return true;
+    });
+
+    return { days: filteredDays };
+  }, [weekData, startDate, endDate]);
+
   // Calculate hours from time string
   const timeToHours = (timeStr) => {
     if (!timeStr || typeof timeStr !== 'string') return null;
@@ -5244,15 +6019,15 @@ const OpsDataModal = ({ weekData, onClose }) => {
     return hours;
   };
 
-  // Calculate OPS statistics
+  // Calculate OPS statistics using filtered data
   const opsStats = useMemo(() => {
     const opsHours = {}; // { opsName: totalHours }
 
-    if (!weekData || !weekData.days) {
+    if (!filteredWeekData || !filteredWeekData.days) {
       return [];
     }
 
-    weekData.days.forEach(day => {
+    filteredWeekData.days.forEach(day => {
       if (!day.shifts || !Array.isArray(day.shifts)) return;
 
       day.shifts.forEach(shift => {
@@ -5292,11 +6067,136 @@ const OpsDataModal = ({ weekData, onClose }) => {
         totalHours,
       }))
       .sort((a, b) => b.totalHours - a.totalHours);
-  }, [weekData]);
+  }, [filteredWeekData]);
+
+  // Calculate busy hours by day of week and shift type
+  const busyHoursData = useMemo(() => {
+    if (!filteredWeekData || !filteredWeekData.days) {
+      return null;
+    }
+
+    // Initialize data structure: { dayOfWeek: { grave: 0, day: 0, swing: 0, count: 0 } }
+    const dayData = {
+      0: { grave: 0, day: 0, swing: 0, count: 0 }, // Sunday
+      1: { grave: 0, day: 0, swing: 0, count: 0 }, // Monday
+      2: { grave: 0, day: 0, swing: 0, count: 0 }, // Tuesday
+      3: { grave: 0, day: 0, swing: 0, count: 0 }, // Wednesday
+      4: { grave: 0, day: 0, swing: 0, count: 0 }, // Thursday
+      5: { grave: 0, day: 0, swing: 0, count: 0 }, // Friday
+      6: { grave: 0, day: 0, swing: 0, count: 0 }, // Saturday
+    };
+
+    filteredWeekData.days.forEach(day => {
+      if (!day.shifts || !Array.isArray(day.shifts)) return;
+
+      const dayDate = getDateOnly(day.date);
+      if (!dayDate) return;
+
+      const dayOfWeek = dayDate.getDay(); // 0 = Sunday, 6 = Saturday
+      dayData[dayOfWeek].count += 1;
+
+      day.shifts.forEach(shift => {
+        const startTime = shift.startTime || '';
+        const endTime = shift.endTime || '';
+        const upperStart = startTime.toUpperCase();
+        const upperEnd = endTime.toUpperCase();
+
+        // Skip shifts with xxxx time
+        if (upperStart === 'XXXX' || upperEnd === 'XXXX') return;
+
+        // Check if it's OPS (blue background)
+        const bgColor = shift.bgColor || '#FFFFFF';
+        let normalizedBg = bgColor.toUpperCase().trim();
+        if (normalizedBg.startsWith('#')) {
+          normalizedBg = normalizedBg.substring(1);
+        }
+        
+        const opsBgNormalized = COLOR_OPS_BG.toUpperCase().trim();
+        let opsBgToCompare = opsBgNormalized.startsWith('#') ? opsBgNormalized.substring(1) : opsBgNormalized;
+        if (opsBgToCompare.length === 8) {
+          opsBgToCompare = opsBgToCompare.substring(0, 6);
+        }
+        const normalizedBgFirst6 = normalizedBg.length >= 6 ? normalizedBg.substring(0, 6) : normalizedBg;
+        
+        const isOps = normalizedBgFirst6 === opsBgToCompare || normalizedBgFirst6 === '7DA6F1';
+        
+        if (!isOps) return; // Only count OPS shifts
+
+        const shiftHours = calculateShiftHours(startTime, endTime);
+        if (shiftHours <= 0) return;
+
+        // Determine which shift periods this shift overlaps with
+        const start = timeToHours(startTime);
+        const end = timeToHours(endTime);
+        
+        if (start === null || end === null) return;
+
+        // Grave: 0000-0800 (0-8)
+        // Day: 0800-1600 (8-16)
+        // Swing: 1600-0000 (16-24)
+        
+        // Calculate overlap for a shift period
+        const calculateOverlap = (periodStart, periodEnd, shiftStart, shiftEnd) => {
+          // Normalize end if it's 24.0 (midnight) - treat as 24 for calculation
+          let normalizedShiftEnd = shiftEnd === 24.0 ? 24 : shiftEnd;
+          
+          // Handle overnight shifts (end < start means it goes past midnight)
+          if (normalizedShiftEnd < shiftStart) {
+            // Overnight shift: split into two parts
+            // Part 1: shiftStart to 24 (before midnight)
+            const part1Start = Math.max(periodStart, shiftStart);
+            const part1End = Math.min(periodEnd, 24);
+            const part1Overlap = Math.max(0, part1End - part1Start);
+            
+            // Part 2: 0 to normalizedShiftEnd (after midnight)
+            const part2Start = Math.max(periodStart, 0);
+            const part2End = Math.min(periodEnd, normalizedShiftEnd);
+            const part2Overlap = Math.max(0, part2End - part2Start);
+            
+            return part1Overlap + part2Overlap;
+          } else {
+            // Normal shift within same day
+            // Handle case where shiftEnd is 24.0 (midnight)
+            const maxEnd = normalizedShiftEnd === 24 ? 24 : normalizedShiftEnd;
+            const overlapStart = Math.max(periodStart, shiftStart);
+            const overlapEnd = Math.min(periodEnd, maxEnd);
+            return Math.max(0, overlapEnd - overlapStart);
+          }
+        };
+
+        // Calculate overlap for each shift period
+        const graveOverlap = calculateOverlap(0, 8, start, end);
+        const dayOverlap = calculateOverlap(8, 16, start, end);
+        const swingOverlap = calculateOverlap(16, 24, start, end);
+        
+        // Add hours to each shift period
+        dayData[dayOfWeek].grave += graveOverlap;
+        dayData[dayOfWeek].day += dayOverlap;
+        dayData[dayOfWeek].swing += swingOverlap;
+      });
+    });
+
+    // Calculate averages if multiple weeks
+    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const result = dayNames.map((dayName, index) => {
+      const data = dayData[index];
+      const weekCount = Math.max(1, data.count); // Avoid division by zero
+      
+      return {
+        dayName: dayName,
+        grave: data.grave / weekCount,
+        dayShift: data.day / weekCount,
+        swing: data.swing / weekCount,
+      };
+    });
+
+    return result;
+  }, [filteredWeekData]);
 
   return (
     <Modal onClose={onClose}>
       <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem", width: "100%", maxWidth: "80rem" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
         <div>
           <h3
             style={{
@@ -5317,9 +6217,286 @@ const OpsDataModal = ({ weekData, onClose }) => {
           >
             
           </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowBusyHours(!showBusyHours)}
+            style={{
+              padding: "0.6rem 1.2rem",
+              backgroundColor: showBusyHours ? "rgba(34, 197, 94, 0.2)" : "rgba(59, 130, 246, 0.15)",
+              border: showBusyHours ? "1px solid rgba(34, 197, 94, 0.5)" : "1px solid rgba(59, 130, 246, 0.45)",
+              borderRadius: "0.5rem",
+              color: showBusyHours ? "#4ade80" : "#60a5fa",
+              fontSize: "0.95rem",
+              fontWeight: 600,
+              cursor: "pointer",
+              transition: "all 0.2s ease",
+            }}
+            onMouseEnter={(e) => {
+              if (!showBusyHours) {
+                e.currentTarget.style.backgroundColor = "rgba(59, 130, 246, 0.25)";
+                e.currentTarget.style.border = "1px solid rgba(59, 130, 246, 0.65)";
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (!showBusyHours) {
+                e.currentTarget.style.backgroundColor = "rgba(59, 130, 246, 0.15)";
+                e.currentTarget.style.border = "1px solid rgba(59, 130, 246, 0.45)";
+              }
+            }}
+          >
+            {showBusyHours ? "Hide Busy Hours" : "Busy Hours"}
+          </button>
         </div>
 
-        {opsStats.length > 0 ? (
+        {showBusyHours && busyHoursData ? (
+          <div
+            style={{
+              backgroundColor: "rgba(15, 23, 42, 0.6)",
+              borderRadius: "0.75rem",
+              border: "1px solid rgba(148, 163, 184, 0.18)",
+              padding: "2rem",
+            }}
+          >
+            <h4
+              style={{
+                fontSize: "1.2rem",
+                fontWeight: 700,
+                color: "#f8fafc",
+                marginBottom: "1.5rem",
+              }}
+            >
+              Busy Hours by Day of Week
+            </h4>
+            
+            {/* Legend */}
+            <div
+              style={{
+                display: "flex",
+                gap: "2rem",
+                marginBottom: "2rem",
+                padding: "1rem",
+                backgroundColor: "rgba(0, 0, 0, 0.3)",
+                borderRadius: "0.5rem",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                <div
+                  style={{
+                    width: "20px",
+                    height: "20px",
+                    backgroundColor: "#FFFFFF",
+                    borderRadius: "0.25rem",
+                    border: "1px solid rgba(148, 163, 184, 0.3)",
+                  }}
+                />
+                <span style={{ color: "#f8fafc", fontSize: "0.9rem" }}>Grave (0000-0800)</span>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                <div
+                  style={{
+                    width: "20px",
+                    height: "20px",
+                    backgroundColor: "#22c55e",
+                    borderRadius: "0.25rem",
+                  }}
+                />
+                <span style={{ color: "#f8fafc", fontSize: "0.9rem" }}>Day (0800-1600)</span>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                <div
+                  style={{
+                    width: "20px",
+                    height: "20px",
+                    backgroundColor: "#3b82f6",
+                    borderRadius: "0.25rem",
+                  }}
+                />
+                <span style={{ color: "#f8fafc", fontSize: "0.9rem" }}>Swing (1600-0000)</span>
+              </div>
+            </div>
+
+            {/* Chart */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+              {busyHoursData.map((dayData, index) => {
+                const maxHours = Math.max(dayData.grave, dayData.dayShift, dayData.swing, 1);
+                const barHeight = 200; // Fixed height for bars
+                
+                return (
+                  <div
+                    key={index}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "1rem",
+                    }}
+                  >
+                    <div
+                      style={{
+                        minWidth: "100px",
+                        fontSize: "0.95rem",
+                        fontWeight: 600,
+                        color: "#f8fafc",
+                      }}
+                    >
+                      {dayData.dayName}
+                    </div>
+                    <div
+                      style={{
+                        flex: 1,
+                        display: "flex",
+                        gap: "0.5rem",
+                        alignItems: "flex-end",
+                        height: `${barHeight}px`,
+                      }}
+                    >
+                      {/* Grave Bar */}
+                      <div
+                        style={{
+                          flex: 1,
+                          display: "flex",
+                          flexDirection: "column",
+                          alignItems: "center",
+                          gap: "0.25rem",
+                          height: `${barHeight}px`,
+                          justifyContent: "flex-end",
+                        }}
+                      >
+                        {dayData.grave > 0 && (
+                          <span
+                            style={{
+                              fontSize: "0.75rem",
+                              color: "#f8fafc",
+                              fontWeight: 600,
+                              marginBottom: "0.25rem",
+                            }}
+                          >
+                            {dayData.grave.toFixed(1)}h
+                          </span>
+                        )}
+                        <div
+                          style={{
+                            width: "100%",
+                            height: `${(dayData.grave / maxHours) * barHeight}px`,
+                            backgroundColor: "#FFFFFF",
+                            borderRadius: "0.375rem 0.375rem 0 0",
+                            border: "2px solid rgba(255, 255, 255, 0.8)",
+                            transition: "height 0.5s ease",
+                            minHeight: dayData.grave > 0 ? "4px" : "0",
+                          }}
+                        />
+                        <span
+                          style={{
+                            fontSize: "0.75rem",
+                            color: "#94a3b8",
+                            fontWeight: 500,
+                            marginTop: "0.25rem",
+                          }}
+                        >
+                          Grave
+                        </span>
+                      </div>
+
+                      {/* Day Bar */}
+                      <div
+                        style={{
+                          flex: 1,
+                          display: "flex",
+                          flexDirection: "column",
+                          alignItems: "center",
+                          gap: "0.25rem",
+                          height: `${barHeight}px`,
+                          justifyContent: "flex-end",
+                        }}
+                      >
+                        {dayData.dayShift > 0 && (
+                          <span
+                            style={{
+                              fontSize: "0.75rem",
+                              color: "#f8fafc",
+                              fontWeight: 600,
+                              marginBottom: "0.25rem",
+                            }}
+                          >
+                            {dayData.dayShift.toFixed(1)}h
+                          </span>
+                        )}
+                        <div
+                          style={{
+                            width: "100%",
+                            height: `${(dayData.dayShift / maxHours) * barHeight}px`,
+                            backgroundColor: "#22c55e",
+                            borderRadius: "0.375rem 0.375rem 0 0",
+                            border: "2px solid rgba(34, 197, 94, 0.6)",
+                            transition: "height 0.5s ease",
+                            minHeight: dayData.dayShift > 0 ? "4px" : "0",
+                          }}
+                        />
+                        <span
+                          style={{
+                            fontSize: "0.75rem",
+                            color: "#94a3b8",
+                            fontWeight: 500,
+                            marginTop: "0.25rem",
+                          }}
+                        >
+                          Day
+                        </span>
+                      </div>
+
+                      {/* Swing Bar */}
+                      <div
+                        style={{
+                          flex: 1,
+                          display: "flex",
+                          flexDirection: "column",
+                          alignItems: "center",
+                          gap: "0.25rem",
+                          height: `${barHeight}px`,
+                          justifyContent: "flex-end",
+                        }}
+                      >
+                        {dayData.swing > 0 && (
+                          <span
+                            style={{
+                              fontSize: "0.75rem",
+                              color: "#f8fafc",
+                              fontWeight: 600,
+                              marginBottom: "0.25rem",
+                            }}
+                          >
+                            {dayData.swing.toFixed(1)}h
+                          </span>
+                        )}
+                        <div
+                          style={{
+                            width: "100%",
+                            height: `${(dayData.swing / maxHours) * barHeight}px`,
+                            backgroundColor: "#3b82f6",
+                            borderRadius: "0.375rem 0.375rem 0 0",
+                            border: "2px solid rgba(59, 130, 246, 0.6)",
+                            transition: "height 0.5s ease",
+                            minHeight: dayData.swing > 0 ? "4px" : "0",
+                          }}
+                        />
+                        <span
+                          style={{
+                            fontSize: "0.75rem",
+                            color: "#94a3b8",
+                            fontWeight: 500,
+                            marginTop: "0.25rem",
+                          }}
+                        >
+                          Swing
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ) : opsStats.length > 0 ? (
           <div
             style={{
               backgroundColor: "rgba(15, 23, 42, 0.6)",
@@ -5377,7 +6554,38 @@ const OpsDataModal = ({ weekData, onClose }) => {
           </div>
         )}
 
-        <div style={{ display: "flex", justifyContent: "flex-end" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          {onBack && (
+            <button
+              type="button"
+              onClick={onBack}
+              style={{
+                padding: "0.6rem 1.2rem",
+                backgroundColor: "rgba(59, 130, 246, 0.15)",
+                border: "1px solid rgba(59, 130, 246, 0.45)",
+                borderRadius: "0.5rem",
+                color: "#60a5fa",
+                fontSize: "0.95rem",
+                fontWeight: 600,
+                cursor: "pointer",
+                transition: "all 0.2s ease",
+                display: "flex",
+                alignItems: "center",
+                gap: "0.5rem",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = "rgba(59, 130, 246, 0.25)";
+                e.currentTarget.style.border = "1px solid rgba(59, 130, 246, 0.65)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = "rgba(59, 130, 246, 0.15)";
+                e.currentTarget.style.border = "1px solid rgba(59, 130, 246, 0.45)";
+              }}
+            >
+              <span>←</span> Back to Summary
+            </button>
+          )}
+          <div style={{ marginLeft: onBack ? "auto" : "0" }}>
           <button
             type="button"
             onClick={onClose}
@@ -5402,6 +6610,7 @@ const OpsDataModal = ({ weekData, onClose }) => {
           >
             Close
           </button>
+          </div>
         </div>
       </div>
     </Modal>
@@ -7123,30 +8332,95 @@ const App = () => {
     );
   };
 
-  const openDetailedSummaryModal = () => {
+  // Store summary modal state for back navigation
+  const [summaryModalState, setSummaryModalState] = useState(null);
+
+  const openDetailedSummaryModal = (startDate, endDate, filteredData) => {
+    // Store state for back navigation
+    setSummaryModalState({ startDate, endDate, filteredData });
+    
+    const handleBack = () => {
+      closeModal(); // Close current modal
+      // Reopen summary modal with preserved state
+      setTimeout(() => {
+        openSummaryModalWithState(startDate, endDate, filteredData);
+      }, 100);
+    };
+
     openModal(
       <DetailedSummaryModal
-        weekData={weekData}
+        weekData={filteredData || weekData}
         onClose={closeModal}
+        startDate={startDate}
+        endDate={endDate}
+        onBack={handleBack}
       />
     );
   };
 
-  const openManagerDataModal = () => {
+  const openManagerDataModal = (startDate, endDate, filteredData) => {
+    // Store state for back navigation
+    setSummaryModalState({ startDate, endDate, filteredData });
+    
+    const handleBack = () => {
+      closeModal(); // Close current modal
+      // Reopen summary modal with preserved state
+      setTimeout(() => {
+        openSummaryModalWithState(startDate, endDate, filteredData);
+      }, 100);
+    };
+
     openModal(
       <ManagerDataModal
-        weekData={weekData}
+        weekData={filteredData || weekData}
         onClose={closeModal}
         db={db}
+        startDate={startDate}
+        endDate={endDate}
+        onBack={handleBack}
       />
     );
   };
 
-  const openOpsDataModal = () => {
+  const openOpsDataModal = (startDate, endDate, filteredData) => {
+    // Store state for back navigation
+    setSummaryModalState({ startDate, endDate, filteredData });
+    
+    const handleBack = () => {
+      closeModal(); // Close current modal
+      // Reopen summary modal with preserved state
+      setTimeout(() => {
+        openSummaryModalWithState(startDate, endDate, filteredData);
+      }, 100);
+    };
+
     openModal(
       <OpsDataModal
+        weekData={filteredData || weekData}
+        onClose={closeModal}
+        startDate={startDate}
+        endDate={endDate}
+        onBack={handleBack}
+      />
+    );
+  };
+
+  // Helper to open summary modal with preserved state
+  const openSummaryModalWithState = (startDate, endDate, filteredData) => {
+    openModal(
+      <SummaryModal
         weekData={weekData}
         onClose={closeModal}
+        isAdmin={isAdmin}
+        weekId={weekId}
+        onOpenDetails={openDetailedSummaryModal}
+        onOpenManagerData={openManagerDataModal}
+        onOpenOpsData={openOpsDataModal}
+        db={db}
+        collectionPath={collectionPath}
+        initialStartDate={startDate}
+        initialEndDate={endDate}
+        initialFilteredData={filteredData}
       />
     );
   };
@@ -7161,6 +8435,8 @@ const App = () => {
         onOpenDetails={openDetailedSummaryModal}
         onOpenManagerData={openManagerDataModal}
         onOpenOpsData={openOpsDataModal}
+        db={db}
+        collectionPath={collectionPath}
       />
     );
   };
@@ -7629,4 +8905,7 @@ const App = () => {
 
 export default App;
 
+                                
 
+
+                                
