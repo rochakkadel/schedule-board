@@ -142,6 +142,7 @@ const DEFAULT_SITE_NAMES = [
   "1019 Market",
    "Sutro Tower",
   "425 Market",
+  "146 Geary",
   "A.Shaef Breaks (717M, 240S, 115S)",
   "A.Hayes Breaks (425C, 101M, 153K, 150P)",
   "Y.Perez Breaks (71S, 1019M, 90NM, 30G)",
@@ -6859,18 +6860,29 @@ const SiteSearchModal = ({ onClose, hasAccess, db, initialSelectedSite = null })
 
   // Filter address suggestions for edit modal
   useEffect(() => {
-    if (!formData.address.trim() || !showEditModal) {
+    if (!showEditModal) {
       setAddressSuggestions([]);
       setShowAddressSuggestions(false);
       return;
     }
 
-    const query = formData.address.toLowerCase();
+    if (!formData.address.trim()) {
+      setAddressSuggestions([]);
+      setShowAddressSuggestions(false);
+      return;
+    }
+
+    const query = formData.address.toLowerCase().trim();
     const matches = sites
-      .filter((site) => site.address?.toLowerCase().includes(query))
+      .filter((site) => {
+        if (!site.address) return false;
+        const addressLower = site.address.toLowerCase();
+        return addressLower.includes(query);
+      })
       .slice(0, 5); // Limit to 5 suggestions
+    
     setAddressSuggestions(matches);
-    setShowAddressSuggestions(matches.length > 0);
+    setShowAddressSuggestions(matches.length > 0 && formData.address.trim().length > 0);
   }, [formData.address, sites, showEditModal]);
 
   const handleSelectSite = (site) => {
@@ -7210,8 +7222,17 @@ const SiteSearchModal = ({ onClose, hasAccess, db, initialSelectedSite = null })
                     setShowAddressSuggestions(true);
                   }}
                   onFocus={() => {
-                    if (addressSuggestions.length > 0) {
-                      setShowAddressSuggestions(true);
+                    // Recalculate suggestions on focus
+                    const query = formData.address.toLowerCase().trim();
+                    if (query.length > 0) {
+                      const matches = sites
+                        .filter((site) => {
+                          if (!site.address) return false;
+                          return site.address.toLowerCase().includes(query);
+                        })
+                        .slice(0, 5);
+                      setAddressSuggestions(matches);
+                      setShowAddressSuggestions(matches.length > 0);
                     }
                   }}
                   onBlur={() => {
