@@ -159,7 +159,7 @@ const COLOR_COMPLETE_FONT = "#FFFFFF"; // White
 const COLOR_OPS_BG = "#7da6f1ff"; // Lighter Blue
 const COLOR_OPS_FONT = "#FFFFFF"; // White
 const ANALYSIS_URL =
-  "https://xxxrkxxxrkxxx-ui.github.io/Analysis/";
+  "https://rochakkadel.github.io/Analysis/";
 const RESEARCH_URL =
   "https://paladinsec-my.sharepoint.com/:x:/r/personal/bperry_palamerican_com1/_layouts/15/doc2.aspx?sourcedoc=%7BF4F6F36A-BECE-4618-ADAC-D38D7AE20154%7D&file=Site%20Trained%20Officers.xlsx&action=default&mobileredirect=true&DefaultItemOpen=1";
 const SITE_MANAGER_URL =
