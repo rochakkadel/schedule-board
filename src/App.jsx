@@ -152,7 +152,7 @@ const DEFAULT_SITE_NAMES = [
   
 ];
 const FONT_COLORS = ["#000000", "#FFFFFF", "#5d0909ff"]; // black, white, red
-const FILL_COLORS = ["#FFFFFF", "#008000", "#0000FF", "#000000", "#FFA500", "#800080"]; // white, green, blue, black, orange, purple
+const FILL_COLORS = ["#FFFFFF", "#008000", "#0000FF", "#000000", "#FFA500", "#ec7eecff", "#b72a0eff"]; // white, green, blue, black, orange, purple
 
 const COLOR_COMPLETE_BG = "#8bf855ff"; // Green for completed shifts
 const COLOR_COMPLETE_FONT = "#FFFFFF"; // White
@@ -796,6 +796,186 @@ const Leaderboard = ({ weekData }) => {
  * Header Component
  */
 /**
+ * Legend Panel Component
+ */
+const LegendPanel = ({ isOpen, onClose }) => {
+  const panelRef = useClickOutside(onClose);
+
+  if (!isOpen) return null;
+
+  return (
+    <div
+      ref={panelRef}
+      style={{
+        position: "fixed",
+        top: "50%",
+        left: "50%",
+        transform: "translate(-50%, -50%)",
+        backgroundColor: "rgba(15, 23, 42, 0.98)",
+        border: "2px solid rgba(148, 163, 184, 0.5)",
+        borderRadius: "0.75rem",
+        padding: "1.5rem",
+        zIndex: 1000,
+        boxShadow: "0 20px 60px rgba(0, 0, 0, 0.8)",
+        minWidth: "400px",
+        maxWidth: "500px",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: "1.25rem",
+          borderBottom: "1px solid rgba(148, 163, 184, 0.3)",
+          paddingBottom: "0.75rem",
+        }}
+      >
+        <h2
+          style={{
+            color: "#e2e8f0",
+            fontSize: "1.5rem",
+            fontWeight: "bold",
+            margin: 0,
+            letterSpacing: "0.05em",
+            textTransform: "uppercase",
+          }}
+        >
+          Shift Color Legend
+        </h2>
+        <button
+          onClick={onClose}
+          style={{
+            backgroundColor: "transparent",
+            border: "1px solid rgba(148, 163, 184, 0.45)",
+            color: "#e2e8f0",
+            borderRadius: "0.375rem",
+            padding: "0.4rem 0.75rem",
+            cursor: "pointer",
+            fontSize: "1rem",
+            fontWeight: 600,
+            transition: "all 0.15s ease",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = "rgba(239, 68, 68, 0.2)";
+            e.currentTarget.style.borderColor = "rgba(239, 68, 68, 0.75)";
+            e.currentTarget.style.color = "#fca5a5";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = "transparent";
+            e.currentTarget.style.borderColor = "rgba(148, 163, 184, 0.45)";
+            e.currentTarget.style.color = "#e2e8f0";
+          }}
+        >
+          Close
+        </button>
+      </div>
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: "0.75rem",
+        }}
+      >
+        <LegendItem
+          color="#8bf855"
+          label="FILLED"
+        />
+        <LegendItem
+          color="#FFFFFF"
+          label="OPEN SHIFT"
+          borderColor="#94a3b8"
+        />
+        <LegendItem
+          color="#000000"
+          label="DARK SHIFT"
+          textColor="#FFFFFF"
+        />
+        <LegendItem
+          color="#7da6f1"
+          label="OPS"
+        />
+        <LegendItem
+          color="#FFA500"
+          label="DONT FILL"
+        />
+        <LegendItem
+          color="#ec7eec"
+          label="NEEDS KEYS"
+        />
+        <LegendItem
+          color="#FFFFFF"
+          label="TAG SHIFT"
+          textColor="#ef4444"
+          showAtSymbol={true}
+          labelColor="#ef4444"
+        />
+        <LegendItem
+          color="#ef4444"
+          label="Attention/Cancel"
+        />
+      </div>
+    </div>
+  );
+};
+
+/**
+ * Legend Item Component
+ */
+const LegendItem = ({
+  color,
+  label,
+  borderColor = "transparent",
+  textColor = "#000000",
+  showAtSymbol = false,
+  labelColor = "#e2e8f0",
+}) => {
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: "1rem",
+        padding: "0.75rem",
+        backgroundColor: "rgba(30, 41, 59, 0.5)",
+        borderRadius: "0.5rem",
+        border: "1px solid rgba(148, 163, 184, 0.2)",
+      }}
+    >
+      <div
+        style={{
+          width: "3rem",
+          height: "2rem",
+          backgroundColor: color,
+          border: borderColor !== "transparent" ? `2px solid ${borderColor}` : "none",
+          borderRadius: "0.375rem",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          flexShrink: 0,
+          color: textColor,
+          fontWeight: "bold",
+          fontSize: showAtSymbol ? "1.2rem" : "0.9rem",
+        }}
+      >
+        {showAtSymbol ? "@" : ""}
+      </div>
+      <div style={{ flex: 1 }}>
+        <div
+          style={{
+            color: labelColor,
+            fontWeight: 600,
+            fontSize: "1.05rem",
+          }}
+        >
+          {label}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/**
  * Site Search Input Component
  */
 const SiteSearchInput = ({ onSelectSite, db }) => {
@@ -961,6 +1141,7 @@ const Header = ({
   const isSubAdmin = Boolean(userInfo?.isSubAdmin);
   const [isAvatarMenuOpen, setIsAvatarMenuOpen] = useState(false);
   const avatarMenuRef = useClickOutside(() => setIsAvatarMenuOpen(false));
+  const [isLegendOpen, setIsLegendOpen] = useState(false);
 
   const navButtonStyle = {
     padding: "0.5rem 0.75rem",
@@ -1023,6 +1204,7 @@ const Header = ({
   );
 
   return (
+    <>
     <header
       className="mb-4 p-4 bg-black border border-white rounded-lg shadow flex flex-col md:flex-row justify-between items-center"
       style={{
@@ -1063,6 +1245,24 @@ const Header = ({
           onSelectSite={onOpenSearch}
           db={db}
         />
+        <button
+          className="micro-pressable micro-pill"
+          type="button"
+          onClick={() => setIsLegendOpen(true)}
+          style={linkButtonStyle}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.border = "1px solid rgba(139, 92, 246, 0.75)";
+            e.currentTarget.style.color = "#c4b5fd";
+            e.currentTarget.style.transform = "translateY(-1px)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.border = "1px solid rgba(148, 163, 184, 0.45)";
+            e.currentTarget.style.color = "#e2e8f0";
+            e.currentTarget.style.transform = "none";
+          }}
+        >
+          Legend
+        </button>
         <button
           className="micro-pressable micro-pill"
           type="button"
@@ -1378,6 +1578,8 @@ const Header = ({
         )}
       </div>
     </header>
+    <LegendPanel isOpen={isLegendOpen} onClose={() => setIsLegendOpen(false)} />
+    </>
   );
 };
 
