@@ -152,7 +152,7 @@ const DEFAULT_SITE_NAMES = [
   
 ];
 const FONT_COLORS = ["#000000", "#FFFFFF", "#5d0909ff"]; // black, white, red
-const FILL_COLORS = ["#FFFFFF", "#008000", "#0000FF", "#000000", "#FFA500", "#ec7eecff", "#b72a0eff"]; // white, green, blue, black, orange, purple
+const FILL_COLORS = ["#FFFFFF", "#008000", "#0000FF", "#000000", "#FFA500", "#ec7eecff", "#f70909ff"]; // white, green, blue, black, orange, purple
 
 const COLOR_COMPLETE_BG = "#8bf855ff"; // Green for completed shifts
 const COLOR_COMPLETE_FONT = "#FFFFFF"; // White
