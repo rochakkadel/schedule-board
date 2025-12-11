@@ -5642,7 +5642,12 @@ const ManagerDataModal = ({ weekData, onClose, db, startDate, endDate, onBack })
           return;
         }
 
-        const managerName = matchedSite.manager;
+        // Normalize manager name to prevent duplicates (trim, normalize whitespace, consistent casing)
+        const managerName = matchedSite.manager 
+          ? matchedSite.manager.trim().replace(/\s+/g, ' ')
+          : '';
+        
+        if (!managerName) return;
         
         // Initialize manager if not exists
         if (!managerHours[managerName]) {
@@ -5668,7 +5673,7 @@ const ManagerDataModal = ({ weekData, onClose, db, startDate, endDate, onBack })
         
         const isOps = normalizedBgFirst6 === opsBgToCompare || normalizedBgFirst6 === '7DA6F1';
 
-        if (isOps) {
+        if (isOps && managerHours[managerName]) {
           managerHours[managerName].opsHours += shiftHours;
         }
       });
@@ -6713,9 +6718,9 @@ const SiteSearchModal = ({ onClose, hasAccess, db, initialSelectedSite = null })
     if (!db) return;
 
     const defaultSites = [
-      { manager: "Doug Fletcher", address: "736 Mission St", uniform: { blazer: "Black", pant: "Black", shirt: "White", tie: "Black" } },
-      { manager: "Doug Fletcher", address: "600 California St", uniform: { blazer: "Black", pant: "Black", shirt: "White", tie: "Black" } },
-      { manager: "Doug Fletcher", address: "120 Kearny St", uniform: { blazer: "Black", pant: "Black", shirt: "White", tie: "Black" } },
+      { manager: "Douglas Fletcher", address: "736 Mission St", uniform: { blazer: "Black", pant: "Black", shirt: "White", tie: "Black" } },
+      { manager: "Douglas Fletcher", address: "600 California St", uniform: { blazer: "Black", pant: "Black", shirt: "White", tie: "Black" } },
+      { manager: "Douglas Fletcher", address: "120 Kearny St", uniform: { blazer: "Black", pant: "Black", shirt: "White", tie: "Black" } },
       { manager: "Jason Daugherty", address: "1128 Market St", uniform: { blazer: "Black", pant: "Black", shirt: "White", tie: "Black" } },
       { manager: "Jason Daugherty", address: "420 23rd St", uniform: { blazer: "Green Jacket", pant: "Cargo (Blk)", shirt: "Polo (Blk)", tie: "---" } },
       { manager: "Jason Daugherty", address: "1 La Avanzada St", uniform: { blazer: "Black", pant: "Black", shirt: "White", tie: "Black" } },

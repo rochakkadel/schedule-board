@@ -1,0 +1,1672 @@
+<!DOCTYPE html>
+
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+      <link rel="icon" type="x/jpeg" href="x.jpeg">
+
+    <title>Rochak Analysis</title>
+
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <link href="https://fonts.googleapis.com/css2?family=Courier+Prime:wght@400;700&display=swap" rel="stylesheet">
+
+    <style>
+
+        body, html {
+
+            font-family: 'Courier Prime', 'Courier New', monospace;
+
+            font-weight: bold;
+
+            background-color: #000000;
+
+            color: #e5e7eb;
+
+            overflow-x: hidden; /* Prevent horizontal scroll, allow vertical */
+
+        }
+
+        .tooltip {
+
+            position: absolute;
+
+            text-align: left;
+
+            padding: 10px;
+
+            font-size: 14px;
+
+            background: #111827;
+
+            border: 1px solid #374151;
+
+            border-radius: 8px;
+
+            pointer-events: none;
+
+            opacity: 0;
+
+            transition: opacity 0.3s;
+
+            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.4), 0 4px 6px -2px rgba(0,0,0,0.2);
+
+            min-width: 220px;
+
+            z-index: 30;
+
+        }
+
+        .axis-label {
+
+            font-size: 14px;
+
+            font-weight: bold;
+
+            fill: #a3e635; /* lime-400 */
+
+        }
+
+         .domain, .tick line {
+
+            stroke: #4b5563;
+
+        }
+
+        .tick text {
+
+            fill: #d1d5db;
+
+            font-size: 12px;
+
+            font-weight: bold;
+
+        }
+
+        #share-feedback {
+
+            transition: opacity 0.5s ease-in-out;
+
+            text-shadow: 0 0 8px #10b981;
+
+        }
+
+        .panel {
+
+             background-color: rgba(10, 15, 25, 0.7);
+
+             backdrop-filter: blur(4px);
+
+             border: 1px solid rgba(130, 255, 130, 0.3);
+
+        }
+
+        #loader {
+
+            position: fixed;
+
+            top: 0;
+
+            left: 0;
+
+            width: 100vw;
+
+            height: 100vh;
+
+            background: #000;
+
+            z-index: 9999;
+
+            display: flex;
+
+            align-items: center;
+
+            justify-content: center;
+
+            transition: opacity 0.7s ease-out, visibility 0.7s ease-out;
+
+        }
+
+        #loader.fade-out {
+
+            opacity: 0;
+
+            visibility: hidden;
+
+        }
+
+        .loader-content {
+
+            z-index: 1;
+
+            text-align: center;
+
+            color: #0f0;
+
+            width: 100%;
+
+            display: flex;
+
+            flex-direction: column;
+
+            align-items: center;
+
+            justify-content: center;
+
+            gap: 2rem;
+
+            position: relative;
+
+            min-height: 100vh;
+
+        }
+
+        .loader-footer {
+
+            position: absolute;
+
+            bottom: 2rem;
+
+            font-size: 1rem;
+
+            color: #10b981;
+
+            opacity: 0.7;
+
+            text-align: center;
+
+            width: 100%;
+
+        }
+
+        .loader-title {
+
+            font-size: 2.5rem;
+
+            letter-spacing: 0.2em;
+
+            animation: flicker 1.5s infinite alternate;
+
+        }
+
+        .loader-subtitle {
+
+            font-size: clamp(2.5rem, 8vw, 6rem);
+
+            font-weight: normal;
+
+            letter-spacing: 0.1em;
+
+            margin: 0;
+
+            text-align: center;
+
+            width: 100%;
+
+            line-height: 1.2;
+
+            font-family: 'Courier Prime', 'Courier New', monospace;
+
+        }
+
+        .loading-spinner {
+
+            width: 60px;
+
+            height: 60px;
+
+            border: 4px solid rgba(16, 185, 129, 0.2);
+
+            border-top-color: #10b981;
+
+            border-radius: 50%;
+
+            animation: spin 1s linear infinite;
+
+            margin-top: 1rem;
+
+        }
+
+        @keyframes spin {
+
+            to { transform: rotate(360deg); }
+
+        }
+
+        @keyframes flicker {
+
+            0%, 18%, 22%, 25%, 53%, 57%, 100% {
+
+                text-shadow:
+
+                    0 0 4px #0f0, 0 0 11px #0f0, 0 0 19px #0f0,
+
+                    0 0 40px #0f0, 0 0 80px #0f0, 0 0 90px #0f0,
+
+                    0 0 100px #0f0, 0 0 150px #0f0;
+
+            }
+
+            20%, 24%, 55% { text-shadow: none; }
+
+        }
+
+        @keyframes blink {
+
+            0%, 50% { opacity: 1; }
+
+            51%, 100% { opacity: 0; }
+
+        }
+
+        #cursor {
+
+            animation: blink 1s step-end infinite;
+
+            display: inline-block;
+
+            color: #10b981;
+
+        }
+
+        #app-wrapper.hidden { display: none; }
+
+        .report-item.active {
+
+            background-color: rgba(163, 230, 53, 0.2);
+
+            border-left-color: #a3e635;
+
+        }
+
+        .btn {
+
+            padding: 0.5rem 1rem;
+
+            font-weight: bold;
+
+            border-radius: 0.5rem;
+
+            transition: all 0.2s ease-in-out;
+
+            border: 1px solid #4b5563; /* gray-600 */
+
+        }
+
+        .btn-primary {
+
+            background-color: white;
+
+            color: black;
+
+            border-color: white;
+
+        }
+
+        .btn-primary:hover {
+
+            background-color: black;
+
+            color: white;
+
+            border-color: white;
+
+        }
+
+        .btn-secondary {
+
+            background-color: white;
+
+            color: black;
+
+            border-color: white;
+
+        }
+
+        .btn-secondary:hover {
+
+            background-color: black;
+
+            color: white;
+
+            border-color: white;
+
+        }
+
+        .btn:disabled {
+
+            opacity: 0.5;
+
+            cursor: not-allowed;
+
+            background-color: #374151;
+
+            border-color: #4b5563;
+
+            color: #9ca3af;
+
+        }
+
+    </style>
+
+</head>
+
+<body class="h-screen">
+
+    <!-- Hacker Loader -->
+
+    <div id="loader">
+
+        <div class="loader-content">
+
+            <p id="typewriter-text" class="loader-subtitle"><span id="typing-effect"></span><span id="cursor">_</span></p>
+
+            <div id="loading-spinner" class="loading-spinner hidden"></div>
+
+            <p class="loader-footer">Rochak Kadel 2025, All rights reserved</p>
+
+        </div>
+
+    </div>
+
+    
+
+    <!-- Modal Dialogs -->
+
+    <div id="modal-backdrop" class="hidden fixed inset-0 bg-black bg-opacity-80 z-50 flex items-center justify-center">
+
+        <!-- Access Code Modal -->
+
+        <div id="password-modal" class="hidden panel p-6 rounded-lg text-center w-80">
+
+            <h3 id="password-modal-title" class="text-lg text-lime-400 mb-4">ACCESS REQUIRED</h3>
+
+            <p id="password-modal-subtitle" class="text-gray-300 mb-4">Enter access code.</p>
+
+            <input type="password" id="password-input" class="bg-gray-900 text-center text-lime-400 font-bold tracking-widest p-2 rounded border border-gray-600 focus:outline-none focus:ring-2 focus:ring-lime-400 w-full">
+
+            <p id="password-error" class="text-red-500 text-xs mt-2 h-4"></p>
+
+            <button id="password-submit" class="btn btn-primary w-full mt-4">SUBMIT</button>
+
+        </div>
+
+        <!-- Save/Edit Report Modal -->
+
+        <div id="report-name-modal" class="hidden panel p-6 rounded-lg text-center w-80">
+
+            <h3 id="report-name-modal-title" class="text-lg text-lime-400 mb-4">SAVE REPORT</h3>
+
+            <p class="text-gray-300 mb-4">Enter a name for this report.</p>
+
+            <input type="text" id="report-name-input" placeholder="e.g., Q3 Call-Offs" class="bg-gray-900 text-center text-lime-400 font-bold p-2 rounded border border-gray-600 focus:outline-none focus:ring-2 focus:ring-lime-400 w-full">
+
+            <p id="save-error" class="text-red-500 text-xs mt-2 h-4"></p>
+
+            <div class="flex gap-4 mt-4">
+
+                <button id="save-cancel" class="btn btn-secondary flex-1">CANCEL</button>
+
+                <button id="save-confirm" class="btn btn-primary flex-1">SAVE</button>
+
+            </div>
+
+        </div>
+
+    </div>
+
+    
+
+    <!-- Past Reports View -->
+
+    <div id="past-reports-view" class="hidden fixed inset-0 bg-black bg-opacity-95 z-40 p-4 sm:p-6 md:p-8 flex flex-col">
+
+        <div class="flex justify-between items-center mb-4 border-b border-gray-700/50 pb-4 flex-shrink-0">
+
+            <h2 class="text-xl sm:text-2xl text-lime-400">PAST REPORTS</h2>
+
+            <button id="back-to-main-view-btn" class="btn btn-primary">Back to Report</button>
+
+        </div>
+
+        <div id="reports-list-container" class="flex-grow overflow-y-auto space-y-2 pr-2">
+
+            <!-- List will be populated here -->
+
+        </div>
+
+    </div>
+
+
+
+    <div id="app-wrapper" class="hidden h-full flex flex-col p-4 sm:p-6 md:p-8">
+
+        <div class="flex justify-between items-center mb-4 border-b border-gray-700/50 pb-4 flex-shrink-0">
+
+            <div>
+
+                <h1 class="text-xl sm:text-2xl text-lime-400 tracking-wider">CALL-OFF ANALYSIS</h1>
+
+                <p id="current-report-title" class="text-sm text-gray-400 h-6 truncate"></p>
+
+            </div>
+
+            <div class="text-right">
+
+                <p class="text-[10px] text-lime-400/80 [text-shadow:0_0_8px_rgba(163,230,53,0.8)]">DEVELOPED BY ROCHAK KADEL</p>
+
+            </div>
+
+        </div>
+
+
+
+        <div id="main-content-panel" class="flex-grow flex flex-col gap-6 min-h-0">
+
+            <div class="panel p-3 rounded-lg flex flex-wrap items-center justify-between gap-4 flex-shrink-0">
+
+                <div class="flex items-center gap-4">
+
+                     <button id="upload-button" class="btn btn-primary">CREATE NEW REPORT</button>
+
+                     <input type="file" id="csv-file-input" accept=".csv" class="hidden">
+
+                     <button id="show-past-reports-btn" class="btn btn-primary">SEE PAST REPORTS</button>
+
+                     <button id="save-report-button" class="hidden btn btn-primary">Save</button>
+
+                </div>
+
+                 <div>
+
+                    <button id="share-button" class="btn btn-primary" disabled>Share Report</button>
+
+                    <span id="share-feedback" class="ml-4 text-emerald-400 opacity-0">Link Copied!</span>
+
+                </div>
+
+            </div>
+
+
+
+            <div id="visualization-container" class="grid grid-cols-1 xl:grid-cols-4 gap-6 flex-grow min-h-0">
+
+                <div id="chart-container" class="xl:col-span-3 w-full panel p-4 rounded-lg overflow-y-auto">
+
+                    <div id="chart-placeholder" class="h-full flex items-center justify-center text-gray-500">
+
+                       <p>Upload a new report or select one from the list.</p>
+
+                    </div>
+
+                    <div id="chart"></div>
+
+                </div>
+
+                <div id="legend-container" class="xl:col-span-1 panel p-4 rounded-lg overflow-y-auto">
+
+                    <h3 class="text-base text-lime-400 tracking-wider mb-3 border-b border-gray-700/50 pb-2">LEGEND</h3>
+
+                    <div id="legend-content" class="hidden">
+
+                        <div class="mb-6">
+
+                            <div class="flex items-center mb-2"><div class="w-4 h-4 rounded-sm bg-lime-500 mr-3"></div><span class="text-sm text-gray-300">Excused</span></div>
+
+                            <div class="flex items-center"><div class="w-4 h-4 rounded-sm bg-red-500 mr-3"></div><span class="text-sm text-gray-300">Unexcused</span></div>
+
+                        </div>
+
+                        <div class="mb-6"><h4 class="font-bold text-sm text-gray-300 mb-2">SUPERVISOR</h4><div id="supervisor-legend" class="space-y-2"></div></div>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+    <div id="tooltip" class="tooltip"></div>
+
+
+
+    <script type="module">
+
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+
+        import { getFirestore, collection, addDoc, onSnapshot, query, doc, getDoc, serverTimestamp, setLogLevel, deleteDoc, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+
+
+        document.addEventListener('DOMContentLoaded', () => {
+
+            // --- Typewriter Animation with Technical Jargon, Loading, then Access Granted ---
+
+            const loader = document.getElementById('loader');
+
+            const appWrapper = document.getElementById('app-wrapper');
+
+            const typingEffect = document.getElementById('typing-effect');
+
+            const loadingSpinner = document.getElementById('loading-spinner');
+
+            
+
+            const startAnimation = () => {
+
+                let charIndex = 0;
+
+                let isDeleting = false;
+
+                let phase = 0; // 0: "Verifying authentication...", 1: backspace to "Verifying ", 2: type "credentials...", 3: backspace all, 4: type "Authenticating user session...", 5: loading, 6: access granted
+
+                
+
+                const message1 = "Verifying authentication...";
+
+                const message2 = "Verifying credentials...";
+
+                const message3 = "Authenticating user session...";
+
+                
+
+                // Phase 1: Type "Verifying authentication..."
+
+                const typeMessage1 = () => {
+
+                    if (charIndex < message1.length) {
+
+                        typingEffect.innerHTML = `<span style="color: #ffffff;">${message1.substring(0, charIndex + 1)}</span>`;
+
+                        charIndex++;
+
+                        setTimeout(typeMessage1, 30);
+
+                    } else {
+
+                        // Pause, then backspace "authentication"
+
+                        setTimeout(() => {
+
+                            isDeleting = true;
+
+                            phase = 1;
+
+                            backspaceAuthentication();
+
+                        }, 200);
+
+                    }
+
+                };
+
+                
+
+                // Backspace "authentication" from "Verifying authentication..."
+
+                const backspaceAuthentication = () => {
+
+                    if (charIndex > 10) { // "Verifying " is 10 characters
+
+                        typingEffect.innerHTML = `<span style="color: #ffffff;">${message1.substring(0, charIndex - 1)}</span>`;
+
+                        charIndex--;
+
+                        setTimeout(backspaceAuthentication, 20);
+
+                    } else {
+
+                        // Now type "credentials..."
+
+                        isDeleting = false;
+
+                        phase = 2;
+
+                        charIndex = 10; // Start from "Verifying "
+
+                        typeCredentials();
+
+                    }
+
+                };
+
+                
+
+                // Type "credentials..." after "Verifying "
+
+                const typeCredentials = () => {
+
+                    if (charIndex < message2.length) {
+
+                        typingEffect.innerHTML = `<span style="color: #ffffff;">${message2.substring(0, charIndex + 1)}</span>`;
+
+                        charIndex++;
+
+                        setTimeout(typeCredentials, 30);
+
+                    } else {
+
+                        // Pause, then backspace everything
+
+                        setTimeout(() => {
+
+                            isDeleting = true;
+
+                            phase = 3;
+
+                            backspaceAll();
+
+                        }, 200);
+
+                    }
+
+                };
+
+                
+
+                // Backspace everything
+
+                const backspaceAll = () => {
+
+                    if (charIndex > 0) {
+
+                        typingEffect.innerHTML = `<span style="color: #ffffff;">${message2.substring(0, charIndex - 1)}</span>`;
+
+                        charIndex--;
+
+                        setTimeout(backspaceAll, 20);
+
+                    } else {
+
+                        // Now type "Authenticating user session..."
+
+                        isDeleting = false;
+
+                        phase = 4;
+
+                        charIndex = 0;
+
+                        typeMessage3();
+
+                    }
+
+                };
+
+                
+
+                // Type "Authenticating user session..."
+
+                const typeMessage3 = () => {
+
+                    if (charIndex < message3.length) {
+
+                        typingEffect.innerHTML = `<span style="color: #ffffff;">${message3.substring(0, charIndex + 1)}</span>`;
+
+                        charIndex++;
+
+                        setTimeout(typeMessage3, 30);
+
+                    } else {
+
+                        // Pause, then show loading
+
+                        setTimeout(() => {
+
+                            phase = 5;
+
+                            showLoading();
+
+                        }, 300);
+
+                    }
+
+                };
+
+                
+
+                // Phase 2: Show "Loading..." with spinner
+
+                const showLoading = () => {
+
+                    loadingSpinner.classList.remove('hidden');
+
+                    const loadingText = "Loading...";
+
+                    charIndex = 0;
+
+                    
+
+                    const typeLoading = () => {
+
+                        if (charIndex < loadingText.length) {
+
+                            typingEffect.innerHTML = `<span style="color: #10b981;">${loadingText.substring(0, charIndex + 1)}</span>`;
+
+                            charIndex++;
+
+                            setTimeout(typeLoading, 50);
+
+                        } else {
+
+                            // Show loading for 1 second, then move to access granted
+
+                            setTimeout(() => {
+
+                                showAccessGranted();
+
+                            }, 1000);
+
+                        }
+
+                    };
+
+                    
+
+                    typeLoading();
+
+                };
+
+                
+
+                // Phase 3: Show "Access Granted"
+
+                const showAccessGranted = () => {
+
+                    loadingSpinner.classList.add('hidden');
+
+                    const grantedText = "Access Granted";
+
+                    charIndex = 0;
+
+                    
+
+                    const typeGranted = () => {
+
+                        if (charIndex < grantedText.length) {
+
+                            const currentText = grantedText.substring(0, charIndex + 1);
+
+                            if (charIndex < 6) {
+
+                                // "Access " - white
+
+                                typingEffect.innerHTML = `<span style="color: #ffffff;">${currentText}</span>`;
+
+                            } else {
+
+                                // "Access " (white) + "Granted" (green)
+
+                                typingEffect.innerHTML = `<span style="color: #ffffff;">Access </span><span style="color: #10b981;">${currentText.substring(7)}</span>`;
+
+                            }
+
+                            charIndex++;
+
+                            setTimeout(typeGranted, 50);
+
+                        } else {
+
+                            // Brief pause, then fade out
+
+                            setTimeout(() => {
+
+                                loader.classList.add('fade-out');
+
+                                loader.addEventListener('transitionend', () => {
+
+                                    loader.style.display = 'none';
+
+                                    appWrapper.classList.remove('hidden');
+
+                                    document.body.style.overflow = 'auto';
+
+                                    initializeChartApp();
+
+                                }, { once: true });
+
+                            }, 700);
+
+                        }
+
+                    };
+
+                    
+
+                    typeGranted();
+
+                };
+
+                
+
+                // Start the animation
+
+                typeMessage1();
+
+            };
+
+            
+
+            // Start animation immediately
+
+            startAnimation();
+
+        });
+
+
+
+        async function initializeChartApp() {
+
+            // --- Firebase Setup ---
+
+            const firebaseConfig = {
+
+              apiKey: "AIzaSyAUOw6yXiMqZtGzkx65Iq7Z2VnTwhHXNPY",
+
+              authDomain: "call-off-tracker.firebaseapp.com",
+
+              projectId: "call-off-tracker",
+
+              storageBucket: "call-off-tracker.appspot.com",
+
+              messagingSenderId: "663920676209",
+
+              appId: "1:663920676209:web:769030ed09f3cdb36dfad0",
+
+              measurementId: "G-LMSZP6RY9X"
+
+            };
+
+            
+
+            if (!firebaseConfig || !firebaseConfig.projectId) {
+
+                document.getElementById('chart-placeholder').innerHTML = '<p class="text-red-500">Firebase configuration is missing or invalid.</p>';
+
+                return;
+
+            }
+
+
+
+            const app = initializeApp(firebaseConfig);
+
+            const auth = getAuth(app);
+
+            const db = getFirestore(app);
+
+            setLogLevel('debug');
+
+
+
+            let authFailed = false;
+
+            try {
+
+                await signInAnonymously(auth);
+
+            } catch(e) {
+
+                console.error("Firebase auth error:", e);
+
+                authFailed = true; 
+
+            }
+
+
+
+            const reportsCollectionPath = `/artifacts/${firebaseConfig.projectId}/public/data/reports`;
+
+            const reportsCollection = collection(db, reportsCollectionPath);
+
+
+
+            // --- DOM Elements ---
+
+            const fileInput = document.getElementById('csv-file-input');
+
+            const shareButton = document.getElementById('share-button');
+
+            const shareFeedback = document.getElementById('share-feedback');
+
+            const uploadButton = document.getElementById('upload-button');
+
+            const saveReportButton = document.getElementById('save-report-button');
+
+            const modalBackdrop = document.getElementById('modal-backdrop');
+
+            const passwordModal = document.getElementById('password-modal');
+
+            const passwordModalTitle = document.getElementById('password-modal-title');
+
+            const passwordModalSubtitle = document.getElementById('password-modal-subtitle');
+
+            const passwordInput = document.getElementById('password-input');
+
+            const passwordSubmit = document.getElementById('password-submit');
+
+            const passwordError = document.getElementById('password-error');
+
+            const reportNameModal = document.getElementById('report-name-modal');
+
+            const reportNameModalTitle = document.getElementById('report-name-modal-title');
+
+            const reportNameInput = document.getElementById('report-name-input');
+
+            const saveConfirm = document.getElementById('save-confirm');
+
+            const saveCancel = document.getElementById('save-cancel');
+
+            const saveError = document.getElementById('save-error');
+
+            const reportsListContainer = document.getElementById('reports-list-container');
+
+            const chartPlaceholder = document.getElementById('chart-placeholder');
+
+            const legendContent = document.getElementById('legend-content');
+
+            const pastReportsView = document.getElementById('past-reports-view');
+
+            const showPastReportsBtn = document.getElementById('show-past-reports-btn');
+
+            const backToMainViewBtn = document.getElementById('back-to-main-view-btn');
+
+            const currentReportTitle = document.getElementById('current-report-title');
+
+
+
+            // --- App State ---
+
+            let currentCsvData = null;
+
+            let currentReportId = null;
+
+            let reports = [];
+
+            let actionToConfirm = null; 
+
+
+
+            // --- Modal & View Handling ---
+
+            const showModal = (modal) => {
+
+                modalBackdrop.classList.remove('hidden');
+
+                modal.classList.remove('hidden');
+
+            };
+
+            const hideModals = () => {
+
+                modalBackdrop.classList.add('hidden');
+
+                passwordModal.classList.add('hidden');
+
+                reportNameModal.classList.add('hidden');
+
+                passwordInput.value = '';
+
+                passwordError.textContent = '';
+
+                reportNameInput.value = '';
+
+                saveError.textContent = '';
+
+                actionToConfirm = null;
+
+            };
+
+            
+
+            modalBackdrop.addEventListener('click', (e) => {
+
+                if(e.target === modalBackdrop) hideModals();
+
+            });
+
+
+
+            uploadButton.addEventListener('click', () => {
+
+                passwordModalTitle.textContent = "ACCESS REQUIRED";
+
+                passwordModalSubtitle.textContent = "Enter access code.";
+
+                actionToConfirm = { type: 'upload' };
+
+                showModal(passwordModal);
+
+            });
+
+            
+
+            passwordSubmit.addEventListener('click', async () => {
+
+                if (passwordInput.value !== '91965') {
+
+                    passwordError.textContent = 'ACCESS DENIED';
+
+                    passwordInput.value = '';
+
+                    return;
+
+                }
+
+                
+
+                if (!actionToConfirm) return;
+
+
+
+                if (actionToConfirm.type === 'upload') {
+
+                    hideModals();
+
+                    fileInput.click();
+
+                } else if (actionToConfirm.type === 'delete') {
+
+                    await deleteReport(actionToConfirm.id);
+
+                    hideModals();
+
+                } else if (actionToConfirm.type === 'edit') {
+
+                    // Correctly transition between modals without resetting state
+
+                    passwordModal.classList.add('hidden'); // Hide current modal
+
+                    passwordInput.value = '';
+
+                    passwordError.textContent = '';
+
+                    
+
+                    reportNameModalTitle.textContent = "EDIT REPORT NAME";
+
+                    reportNameInput.value = actionToConfirm.name;
+
+                    reportNameModal.classList.remove('hidden'); // Show next modal
+
+                }
+
+            });
+
+
+
+            saveReportButton.addEventListener('click', () => {
+
+                reportNameModalTitle.textContent = "SAVE REPORT";
+
+                actionToConfirm = { type: 'save' };
+
+                showModal(reportNameModal);
+
+            });
+
+
+
+            saveCancel.addEventListener('click', hideModals);
+
+
+
+            saveConfirm.addEventListener('click', async () => {
+
+                if (authFailed) {
+
+                    saveError.textContent = "Auth failed. Enable Anonymous sign-in in Firebase.";
+
+                    return;
+
+                }
+
+                saveConfirm.disabled = true;
+
+                saveConfirm.textContent = 'SAVING...';
+
+                saveError.textContent = '';
+
+                const reportName = reportNameInput.value.trim();
+
+                
+
+                if (!reportName) {
+
+                    saveError.textContent = "Report name cannot be empty.";
+
+                    saveConfirm.disabled = false;
+
+                    saveConfirm.textContent = 'SAVE';
+
+                    return;
+
+                }
+
+
+
+                try {
+
+                    if (actionToConfirm && actionToConfirm.type === 'edit') {
+
+                        // Handle editing existing report
+
+                        const docRef = doc(db, reportsCollectionPath, actionToConfirm.id);
+
+                        await updateDoc(docRef, { name: reportName });
+
+                        if(currentReportId === actionToConfirm.id) {
+
+                            currentReportTitle.textContent = reportName;
+
+                        }
+
+                    } else { 
+
+                        // Handle saving new report
+
+                         if (!currentCsvData) {
+
+                            saveError.textContent = "No data to save.";
+
+                            return;
+
+                        }
+
+                        const docRef = await addDoc(reportsCollection, {
+
+                            name: reportName,
+
+                            csvData: currentCsvData,
+
+                            createdAt: serverTimestamp()
+
+                        });
+
+                        loadReport(docRef.id, currentCsvData, reportName);
+
+                    }
+
+
+
+                     hideModals();
+
+                } catch(e) {
+
+                    console.error("Error saving/updating report:", e);
+
+                    saveError.textContent = `Failed to save: ${e.message}`;
+
+                } finally {
+
+                    saveConfirm.disabled = false;
+
+                    saveConfirm.textContent = 'SAVE';
+
+                }
+
+            });
+
+
+
+            showPastReportsBtn.addEventListener('click', () => {
+
+                pastReportsView.classList.remove('hidden');
+
+            });
+
+            backToMainViewBtn.addEventListener('click', () => {
+
+                pastReportsView.classList.add('hidden');
+
+            });
+
+
+
+            // --- Data & Rendering ---
+
+            const clearChart = () => {
+
+                d3.select("#chart").selectAll("*").remove();
+
+                d3.select("#supervisor-legend").selectAll("*").remove();
+
+                legendContent.classList.add('hidden');
+
+                chartPlaceholder.style.display = 'flex';
+
+                currentCsvData = null;
+
+                currentReportId = null;
+
+                shareButton.disabled = true;
+
+                currentReportTitle.textContent = '';
+
+            };
+
+            
+
+            const deleteReport = async (reportId) => {
+
+                if (!reportId) return;
+
+                try {
+
+                    const docRef = doc(db, reportsCollectionPath, reportId);
+
+                    await deleteDoc(docRef);
+
+                    if (currentReportId === reportId) {
+
+                        clearChart();
+
+                    }
+
+                } catch (e) {
+
+                    console.error("Error deleting report:", e);
+
+                    alert(`Failed to delete report: ${e.message}`);
+
+                }
+
+            };
+
+
+
+            const renderChart = (csvData) => {
+
+                if(!csvData) return;
+
+                
+
+                const data = d3.csvParse(csvData);
+
+                chartPlaceholder.style.display = 'none';
+
+                legendContent.classList.remove('hidden');
+
+                d3.select("#chart").selectAll("*").remove();
+
+                d3.select("#supervisor-legend").selectAll("*").remove();
+
+
+
+                const employeeData = d3.rollups(data, v => {
+
+                    const excused = d3.sum(v, d => d.Excused === '1' ? 1 : 0);
+
+                    return { excused, unexcused: v.length - excused, total: v.length, supervisor: v[0].Supervisor };
+
+                }, d => `${d.FirstName} ${d.LastName}`).map(([name, values]) => ({ name, ...values }));
+
+
+
+                employeeData.sort((a, b) => b.total - a.total);
+
+
+
+                const supervisors = [...new Set(employeeData.map(d => d.supervisor))].sort();
+
+                const supervisorStats = new Map(d3.rollups(data, v => v.length, d => d.Supervisor));
+
+
+
+                const margin = { top: 20, right: 30, bottom: 40, left: 150 };
+
+                const chartElement = document.getElementById('chart-container');
+
+                const width = chartElement.clientWidth - margin.left - margin.right;
+
+                const height = Math.max(600, employeeData.length * 35);
+
+                
+
+                d3.select("#chart").style('height', `${height + margin.top + margin.bottom}px`);
+
+
+
+                const svg = d3.select("#chart").append("svg")
+
+                    .attr("width", "100%").attr("height", "100%")
+
+                    .attr('viewBox', `0 0 ${width + margin.left + margin.right} ${height + margin.top + margin.bottom}`)
+
+                    .append("g").attr("transform", `translate(${margin.left},${margin.top})`);
+
+                
+
+                const xScale = d3.scaleLinear().domain([0, d3.max(employeeData, d => d.total) || 1]).range([0, width]);
+
+                const yScale = d3.scaleBand().domain(employeeData.map(d => d.name)).range([0, height]).padding(0.5);
+
+                
+
+                svg.append("g").call(d3.axisLeft(yScale).tickSize(0)).select(".domain").remove();
+
+                svg.append("g").attr("transform", `translate(0,${height})`).call(d3.axisBottom(xScale).ticks(Math.min(10, d3.max(employeeData, d => d.total))));
+
+                svg.append("text").attr("class", "axis-label").attr("text-anchor", "middle").attr("x", width / 2).attr("y", height + margin.bottom - 5).text("Number of Call-Offs");
+
+
+
+                const tooltip = d3.select("#tooltip");
+
+                const groups = svg.selectAll(".bar-group").data(employeeData).enter().append("g")
+
+                    .attr("class", "bar-group").attr("transform", d => `translate(0, ${yScale(d.name)})`)
+
+                    .on("mouseover", (event, d) => {
+
+                        tooltip.style("opacity", 1).html(`<div class="font-bold text-white text-base">${d.name}</div><div class="text-sm text-gray-400 mb-2">Supervisor: ${d.supervisor}</div><hr class="border-gray-600 my-1"><div class="flex justify-between text-sm"><span class="text-gray-300">Total:</span> <span class="font-bold text-white">${d.total}</span></div><div><span class="text-lime-400">Excused:</span> <span class="font-bold text-white">${d.excused}</span></div><div><span class="text-red-400">Unexcused:</span> <span class="font-bold text-white">${d.unexcused}</span></div>`)
+
+                        .style("left", `${event.pageX + 20}px`).style("top", `${event.pageY - 20}px`);
+
+                    }).on("mouseout", () => tooltip.style("opacity", 0));
+
+                
+
+                // Unexcused portion
+
+                groups.append("rect")
+
+                    .attr("x", 0)
+
+                    .attr("y", 0)
+
+                    .attr("width", d => Math.max(0, xScale(d.unexcused)))
+
+                    .attr("height", yScale.bandwidth())
+
+                    .attr("fill", "#ef4444") // red-500
+
+                    .attr("rx", 2);
+
+                
+
+                // Excused portion (stacked on top)
+
+                groups.append("rect")
+
+                    .attr("x", d => xScale(d.unexcused))
+
+                    .attr("y", 0)
+
+                    .attr("width", d => Math.max(0, xScale(d.excused)))
+
+                    .attr("height", yScale.bandwidth())
+
+                    .attr("fill", "#84cc16") // lime-500
+
+                    .attr("rx", 2);
+
+
+
+                supervisors.forEach(sup => {
+
+                    const count = supervisorStats.get(sup) || 0;
+
+                    const legendItem = d3.select("#supervisor-legend").append("div").attr("class", "flex items-center justify-between");
+
+                    const nameContainer = legendItem.append("div").attr("class", "flex items-center");
+
+                    nameContainer.append("span").text(sup).attr("class", "text-sm text-gray-300 truncate pr-2");
+
+                    legendItem.append("span").text(count).attr("class", "text-sm font-bold text-lime-400");
+
+                });
+
+            };
+
+
+
+            const loadReport = (reportId, csvData, reportName) => {
+
+                currentReportId = reportId;
+
+                currentCsvData = csvData;
+
+                currentReportTitle.textContent = reportName || '';
+
+                renderChart(csvData);
+
+                saveReportButton.classList.add('hidden');
+
+                shareButton.disabled = false;
+
+                
+
+                document.querySelectorAll('.report-item').forEach(el => {
+
+                    el.classList.toggle('active', el.dataset.id === reportId);
+
+                });
+
+                pastReportsView.classList.add('hidden');
+
+            };
+
+
+
+            const renderReportsList = () => {
+
+                reportsListContainer.innerHTML = '';
+
+                reports.sort((a,b) => b.createdAt?.toMillis() - a.createdAt?.toMillis());
+
+                reports.forEach(report => {
+
+                    const item = document.createElement('div');
+
+                    item.className = 'report-item flex justify-between items-center p-3 rounded-lg border-l-4 border-transparent hover:bg-gray-800/50 transition-colors duration-200';
+
+                    item.dataset.id = report.id;
+
+                    
+
+                    const infoDiv = document.createElement('div');
+
+                    infoDiv.className = "flex-grow cursor-pointer pr-4";
+
+                    infoDiv.innerHTML = `<p class="font-bold text-white truncate">${report.name}</p><p class="text-xs text-gray-400">${report.createdAt ? new Date(report.createdAt.toMillis()).toLocaleDateString() : 'No date'}</p>`;
+
+                    infoDiv.addEventListener('click', () => loadReport(report.id, report.csvData, report.name));
+
+
+
+                    const controlsDiv = document.createElement('div');
+
+                    controlsDiv.className = "flex items-center gap-2 flex-shrink-0";
+
+                    
+
+                    const editBtn = document.createElement('button');
+
+                    editBtn.className = 'edit-btn p-2 rounded-full hover:bg-blue-500/20 text-gray-500 hover:text-blue-400 transition-colors';
+
+                    editBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M17.414 2.586a2 2 0 00-2.828 0L7 10.172V13h2.828l7.586-7.586a2 2 0 000-2.828z" /><path fill-rule="evenodd" d="M2 6a2 2 0 012-2h4a1 1 0 010 2H4v10h10v-4a1 1 0 112 0v4a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" clip-rule="evenodd" /></svg>`;
+
+                    editBtn.addEventListener('click', (e) => {
+
+                        e.stopPropagation();
+
+                        passwordModalTitle.textContent = "EDIT REPORT";
+
+                        passwordModalSubtitle.textContent = `Enter access code to edit "${report.name}"`;
+
+                        actionToConfirm = { type: 'edit', id: report.id, name: report.name };
+
+                        showModal(passwordModal);
+
+                    });
+
+
+
+                    const deleteBtn = document.createElement('button');
+
+                    deleteBtn.className = 'delete-btn p-2 rounded-full hover:bg-red-500/20 text-gray-500 hover:text-red-400 transition-colors';
+
+                    deleteBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 011-1h4a1 1 0 110 2H8a1 1 0 01-1-1z" clip-rule="evenodd" /></svg>`;
+
+                    deleteBtn.addEventListener('click', (e) => {
+
+                        e.stopPropagation();
+
+                        passwordModalTitle.textContent = "CONFIRM DELETE";
+
+                        passwordModalSubtitle.textContent = `Enter access code to delete "${report.name}"`;
+
+                        actionToConfirm = { type: 'delete', id: report.id };
+
+                        showModal(passwordModal);
+
+                    });
+
+
+
+                    controlsDiv.appendChild(editBtn);
+
+                    controlsDiv.appendChild(deleteBtn);
+
+                    item.appendChild(infoDiv);
+
+                    item.appendChild(controlsDiv);
+
+                    reportsListContainer.appendChild(item);
+
+                });
+
+            };
+
+
+
+            // --- Firestore Listener ---
+
+            onSnapshot(query(reportsCollection), (snapshot) => {
+
+                reports = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+                renderReportsList();
+
+                if(currentReportId) {
+
+                     document.querySelectorAll('.report-item').forEach(el => {
+
+                        el.classList.toggle('active', el.dataset.id === currentReportId);
+
+                    });
+
+                }
+
+            });
+
+
+
+            // --- Event Listeners ---
+
+            fileInput.addEventListener('change', (event) => {
+
+                const file = event.target.files[0];
+
+                if (!file) return;
+
+                const reader = new FileReader();
+
+                reader.onload = e => {
+
+                    currentCsvData = e.target.result;
+
+                    currentReportId = null;
+
+                    renderChart(currentCsvData);
+
+                    saveReportButton.classList.remove('hidden');
+
+                    shareButton.disabled = true;
+
+                    document.querySelectorAll('.report-item').forEach(el => el.classList.remove('active'));
+
+                    currentReportTitle.textContent = `[New Report: ${file.name}]`;
+
+                };
+
+                reader.readAsText(file);
+
+            });
+
+
+
+            shareButton.addEventListener('click', () => {
+
+                if (!currentReportId) return;
+
+                const url = `${window.location.origin}${window.location.pathname}?reportId=${currentReportId}`;
+
+                navigator.clipboard.writeText(url).then(() => {
+
+                    shareFeedback.style.opacity = '1';
+
+                    setTimeout(() => { shareFeedback.style.opacity = '0'; }, 2000);
+
+                });
+
+            });
+
+
+
+            // --- Initial Load from URL ---
+
+            const urlParams = new URLSearchParams(window.location.search);
+
+            const reportIdFromUrl = urlParams.get('reportId');
+
+            if (reportIdFromUrl) {
+
+                const docRef = doc(db, reportsCollectionPath, reportIdFromUrl);
+
+                getDoc(docRef).then(docSnap => {
+
+                    if (docSnap.exists()) {
+
+                        const report = docSnap.data();
+
+                        loadReport(docSnap.id, report.csvData, report.name);
+
+                    } else {
+
+                        console.log("No such document!");
+
+                    }
+
+                }).catch(error => { console.error("Error getting document:", error); });
+
+            }
+
+
+
+            window.addEventListener('resize', () => {
+
+                if(currentCsvData) renderChart(currentCsvData);
+
+            });
+
+        }
+
+    </script>
+
+</body>
+
+</html>
+
