@@ -690,8 +690,8 @@ const Leaderboard = ({ weekData }) => {
       style={{
         display: "flex",
         alignItems: "center",
-        gap: "0.5rem",
-        padding: "0.65rem 0.95rem",
+        gap: "0.75rem",
+        padding: "0.85rem 1.2rem",
         backgroundColor: "rgba(15, 23, 42, 0.65)",
         borderRadius: "0.5rem",
         border: "1px solid rgba(148, 163, 184, 0.25)",
@@ -712,7 +712,7 @@ const Leaderboard = ({ weekData }) => {
         style={{
           display: "flex",
           alignItems: "center",
-          gap: "0.5rem",
+          gap: "0.75rem",
           flexWrap: "wrap",
         }}
       >
@@ -722,8 +722,8 @@ const Leaderboard = ({ weekData }) => {
             style={{
               display: "flex",
               alignItems: "center",
-              gap: "0.35rem",
-              padding: "0.35rem 0.65rem",
+              gap: "0.5rem",
+              padding: "0.5rem 0.85rem",
               position: "relative",
               backgroundColor: index === 0 
                 ? "rgba(255, 215, 0, 0.15)" 
@@ -745,7 +745,7 @@ const Leaderboard = ({ weekData }) => {
             {getTrophyIcon(index) && (
               <span 
                 style={{ 
-                  fontSize: index === 0 ? "1.4rem" : "1.2rem",
+                  fontSize: index === 0 ? "1.8rem" : "1.5rem",
                   ...(index === 0 && {
                     filter: "drop-shadow(0 0 4px rgba(255, 215, 0, 0.9)) drop-shadow(0 0 8px rgba(255, 193, 7, 0.7)) drop-shadow(0 0 12px rgba(255, 152, 0, 0.5))",
                     animation: "goldGlow 2s ease-in-out infinite alternate",
@@ -761,7 +761,7 @@ const Leaderboard = ({ weekData }) => {
             )}
             <span
               style={{
-                fontSize: "1.1rem",
+                fontSize: "1.35rem",
                 fontWeight: 700,
                 color: getTrophyColor(index),
                 ...(index === 0 && {
@@ -774,7 +774,7 @@ const Leaderboard = ({ weekData }) => {
             </span>
             <span
               style={{
-                fontSize: "1.0rem",
+                fontSize: "1.2rem",
                 color: getTrophyColor(index),
                 fontWeight: 600,
                 ...(index === 0 && {
@@ -912,7 +912,7 @@ const LegendPanel = ({ isOpen, onClose }) => {
         />
         <LegendItem
           color="#ef4444"
-          label="Attention/Cancel"
+          label="ATTENTION/CANCEL"
         />
       </div>
     </div>
@@ -1144,13 +1144,13 @@ const Header = ({
   const [isLegendOpen, setIsLegendOpen] = useState(false);
 
   const navButtonStyle = {
-    padding: "0.5rem 0.75rem",
+    padding: "0.35rem 0.55rem",
     backgroundColor: "#1f2937",
     border: "2px solid #ffffff",
     color: "#ffffff",
     borderRadius: "0.375rem",
     fontWeight: "bold",
-    fontSize: "1.15rem",
+    fontSize: "0.95rem",
     cursor: "pointer",
     transition: "background-color 0.15s ease",
   };
@@ -1208,8 +1208,8 @@ const Header = ({
     <header
       className="mb-4 p-4 bg-black border border-white rounded-lg shadow flex flex-col md:flex-row justify-between items-center"
       style={{
-        marginBottom: "1rem",
-        padding: "1rem",
+        marginBottom: "0.01rem",
+        padding: "0.1rem 1rem",
         backgroundColor: "#000000",
         border: "1px solid #ffffff",
         borderRadius: "0.5rem",
