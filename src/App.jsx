@@ -796,6 +796,592 @@ const Leaderboard = ({ weekData }) => {
  * Header Component
  */
 /**
+ * Report Modal Component
+ */
+const ReportModal = ({ isOpen, onClose, weekData, db }) => {
+  const [reportDate, setReportDate] = useState(() => {
+    const today = new Date();
+    // Use local date to avoid timezone issues
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  });
+  const [startTime, setStartTime] = useState("0700");
+  const [endTime, setEndTime] = useState("1500");
+  const [reportContent, setReportContent] = useState("");
+  const [reportContentHtml, setReportContentHtml] = useState("");
+  const [showReport, setShowReport] = useState(false);
+  const [copyButtonText, setCopyButtonText] = useState("Copy Content");
+  const modalRef = useClickOutside(() => {
+    onClose();
+  });
+
+  // Reset report state when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setShowReport(false);
+      setReportContent("");
+      setReportContentHtml("");
+      setCopyButtonText("Copy Content");
+    }
+  }, [isOpen]);
+
+  const timeToHours = (timeStr) => {
+    if (!timeStr) return null;
+    const str = String(timeStr).padStart(4, '0');
+    if (str.length !== 4) return null;
+    const hours = parseInt(str.substring(0, 2), 10);
+    const minutes = parseInt(str.substring(2, 4), 10);
+    if (isNaN(hours) || isNaN(minutes)) return null;
+    return hours + (minutes / 60);
+  };
+
+  const formatTime = (timeStr) => {
+    if (!timeStr) return "";
+    const str = String(timeStr).padStart(4, '0');
+    if (str.length !== 4) return String(timeStr);
+    return `${str.substring(0, 2)}:${str.substring(2, 4)}`;
+  };
+
+  const generateReport = () => {
+    try {
+      if (!weekData || !weekData.days) {
+        setReportContent("No data available.");
+        setShowReport(true);
+        return;
+      }
+
+      // Parse date as local date to avoid timezone issues
+      const dateParts = reportDate.split('-');
+      const startDate = new Date(parseInt(dateParts[0]), parseInt(dateParts[1]) - 1, parseInt(dateParts[2]));
+      const startHour = timeToHours(startTime);
+      const endHour = timeToHours(endTime);
+      
+      if (startHour === null || endHour === null) {
+        alert("Invalid time format. Please use HHMM format (e.g., 0700, 1500)");
+        return;
+      }
+
+      startDate.setHours(Math.floor(startHour), (startHour % 1) * 60, 0, 0);
+      
+      const endDate = new Date(startDate);
+      if (endHour < startHour) {
+        endDate.setDate(endDate.getDate() + 1);
+      }
+      endDate.setHours(Math.floor(endHour), (endHour % 1) * 60, 0, 0);
+      
+      // Next 8 hours from end time for upcoming open shifts
+      const upcomingShiftsEndTime = new Date(endDate);
+      upcomingShiftsEndTime.setHours(upcomingShiftsEndTime.getHours() + 8);
+
+      // Get the selected day for call-offs (just the date, not time range)
+      const selectedDay = new Date(parseInt(dateParts[0]), parseInt(dateParts[1]) - 1, parseInt(dateParts[2]));
+      selectedDay.setHours(0, 0, 0, 0);
+      const selectedDayEnd = new Date(selectedDay);
+      selectedDayEnd.setHours(23, 59, 59, 999);
+
+      // Format date as MM/DD
+      const month = String(parseInt(dateParts[1])).padStart(2, '0');
+      const day = String(parseInt(dateParts[2])).padStart(2, '0');
+      const dateStr = `${month}/${day}`;
+      
+      let report = `${dateStr} ${startTime}-${endTime} PASSDOWN REPORT\n\n`;
+      
+      const openShifts = [];
+      const opsShifts = [];
+      const callOffs = [];
+      const darkShifts = [];
+
+    weekData.days.forEach(day => {
+      if (!day || !day.shifts || !day.shifts.length) return;
+      
+      let dayDate;
+      try {
+        dayDate = day.date instanceof Date ? day.date : new Date(day.date);
+        if (isNaN(dayDate.getTime())) return; // Invalid date
+      } catch (e) {
+        return; // Skip this day if date is invalid
+      }
+      
+      const dayStart = new Date(dayDate);
+      dayStart.setHours(0, 0, 0, 0);
+      const dayEnd = new Date(dayDate);
+      dayEnd.setHours(23, 59, 59, 999);
+
+      day.shifts.forEach(shift => {
+        if (!shift) return;
+        const shiftStart = timeToHours(shift.startTime);
+        const shiftEnd = timeToHours(shift.endTime);
+        if (shiftStart === null || shiftEnd === null) return;
+
+        const shiftStartTime = new Date(dayDate);
+        shiftStartTime.setHours(Math.floor(shiftStart), (shiftStart % 1) * 60, 0, 0);
+        
+        let shiftEndTime = new Date(dayDate);
+        if (shiftEnd < shiftStart) {
+          shiftEndTime.setDate(shiftEndTime.getDate() + 1);
+        }
+        shiftEndTime.setHours(Math.floor(shiftEnd), (shiftEnd % 1) * 60, 0, 0);
+
+        const bgColor = shift.bgColor || "#FFFFFF";
+        const normalizedBg = (typeof bgColor === 'string' ? bgColor : String(bgColor || "#FFFFFF")).toUpperCase().trim();
+        const bgNoHash = normalizedBg.startsWith('#') ? normalizedBg.substring(1) : normalizedBg;
+        const bgFirst6 = bgNoHash.length >= 6 ? bgNoHash.substring(0, 6) : bgNoHash;
+        const opsBgNormalized = COLOR_OPS_BG.toUpperCase().trim();
+        const opsBgNoHash = opsBgNormalized.startsWith('#') ? opsBgNormalized.substring(1) : opsBgNormalized;
+        const opsBgFirst6 = opsBgNoHash.length >= 6 ? opsBgNoHash.substring(0, 6) : opsBgNoHash;
+        const isOps = bgFirst6 === "7DA6F1" || bgFirst6 === opsBgFirst6;
+        const isFilled = normalizedBg !== "#FFFFFF" && normalizedBg !== "FFFFFF" && !isOps;
+        const isOpen = normalizedBg === "#FFFFFF" || normalizedBg === "FFFFFF";
+        const isDark = normalizedBg === "#000000" || normalizedBg === "000000";
+        
+        // Check if shift is xxxx (not counted as dark shift)
+        const isXxxx = (shift.startTime && String(shift.startTime).toUpperCase() === "XXXX") || 
+                       (shift.endTime && String(shift.endTime).toUpperCase() === "XXXX");
+
+        // Open shifts (white background) from endDate to next 8 hours, in chronological order
+        if (shiftStartTime >= endDate && shiftStartTime <= upcomingShiftsEndTime && isOpen) {
+          // Keep full site name including parentheses content
+          const siteName = shift.site || "";
+          openShifts.push({
+            site: siteName,
+            time: `${formatTime(shift.startTime)}-${formatTime(shift.endTime)}`,
+            date: dayDate,
+            startTime: shiftStartTime,
+            originalShift: shift
+          });
+        }
+
+        // OPS shifts (blue background) between start and end time
+        if (shiftStartTime >= startDate && shiftStartTime <= endDate && isOps) {
+          // Keep full site name including parentheses content
+          const siteName = shift.site || "";
+          const initials = (shift.initials && typeof shift.initials === 'string') ? shift.initials : "";
+          opsShifts.push({
+            site: siteName,
+            hours: shiftEnd < shiftStart ? (24 - shiftStart) + shiftEnd : shiftEnd - shiftStart,
+            time: `${formatTime(shift.startTime)}-${formatTime(shift.endTime)}`,
+            initials: initials,
+            startTime: shiftStartTime
+          });
+        }
+
+        // Dark shifts (black background, but not xxxx) - use entered text time, not string characters
+        if (shiftStartTime >= startDate && shiftStartTime <= endDate && isDark && !isXxxx) {
+          // Keep full site name including parentheses content
+          const siteName = shift.site || "";
+          // Use the actual time values, not formatted if they're text
+          const timeStr = shift.startTime && shift.endTime 
+            ? `${shift.startTime}-${shift.endTime}` 
+            : `${formatTime(shift.startTime)}-${formatTime(shift.endTime)}`;
+          darkShifts.push({
+            site: siteName,
+            time: timeStr
+          });
+        }
+
+        // Call-offs for the selected day (not filtered by time range, just the day)
+        const dayDateForCallOff = dayDate instanceof Date ? day.date : new Date(day.date);
+        if (dayDateForCallOff >= selectedDay && dayDateForCallOff <= selectedDayEnd) {
+          if (shift.comments && Array.isArray(shift.comments) && shift.comments.length > 0) {
+            shift.comments.forEach(comment => {
+              if (!comment || typeof comment !== 'string') return;
+              const commentLower = comment.toLowerCase();
+              if (commentLower.includes("call") || commentLower.includes("off") || commentLower.includes("calloff") || commentLower.includes("call-off")) {
+                const siteName = stripParentheses(shift.site || "");
+                callOffs.push({
+                  site: siteName,
+                  comment: comment,
+                  time: `${formatTime(shift.startTime)}-${formatTime(shift.endTime)}`,
+                  initials: (shift.initials && typeof shift.initials === 'string') ? shift.initials : ""
+                });
+              }
+            });
+          }
+        }
+      });
+
+      // Day notes call-offs for the selected day - include all notes from the Notes / Call Offs log
+      try {
+        const dayDateForNotes = day.date instanceof Date ? day.date : new Date(day.date);
+        if (!isNaN(dayDateForNotes.getTime()) && dayDateForNotes >= selectedDay && dayDateForNotes <= selectedDayEnd) {
+          // day.notes is an array of note objects
+          if (day.notes && Array.isArray(day.notes) && day.notes.length > 0) {
+            day.notes.forEach(note => {
+              if (note && note.text && typeof note.text === 'string' && note.text.trim()) {
+                callOffs.push({
+                  site: "Day Notes",
+                  comment: note.text,
+                  time: "",
+                  initials: note.user || ""
+                });
+              }
+            });
+          }
+          // Also check if day.notes is a string (legacy format)
+          else if (day.notes && typeof day.notes === 'string' && day.notes.trim()) {
+            callOffs.push({
+              site: "Day Notes",
+              comment: day.notes,
+              time: "",
+              initials: ""
+            });
+          }
+        }
+      } catch (e) {
+        // Skip if date is invalid
+      }
+    });
+
+    report += "UPCOMING OPEN SHIFTS:\n";
+    if (openShifts.length === 0) {
+      report += "None\n";
+    } else {
+      // Sort by earliest starting shift
+      openShifts.sort((a, b) => {
+        if (!a.startTime || !b.startTime) return 0;
+        return a.startTime.getTime() - b.startTime.getTime();
+      });
+      
+      openShifts.forEach(shift => {
+        if (!shift) return;
+        // Keep full site name including parentheses content
+        const siteName = shift.site || "";
+        report += `- ${siteName} ${shift.time || ""}\n`;
+      });
+    }
+
+    report += "\nLOCATION OF OPERATIONS:\n";
+    if (opsShifts.length === 0) {
+      report += "None\n";
+    } else {
+      // Sort by start time
+      opsShifts.sort((a, b) => {
+        if (!a.startTime || !b.startTime) return 0;
+        return a.startTime.getTime() - b.startTime.getTime();
+      });
+      // Show each OPS shift with format: Full Site Name (Initials) HH:MM-HH:MM
+      // Site name already includes parentheses content, add initials if present
+      opsShifts.forEach(shift => {
+        const siteName = shift.site || "";
+        const initialsStr = shift.initials ? ` (${shift.initials})` : "";
+        // Show full site name with parentheses content, then add initials
+        report += `- ${siteName}${initialsStr} ${shift.time}\n`;
+      });
+    }
+
+    report += "\nCALL OFFS:\n";
+    if (callOffs.length === 0) {
+      report += "None\n";
+    } else {
+      callOffs.forEach(callOff => {
+        if (!callOff) return;
+        // Just show the content, not who entered it
+        report += `- ${callOff.comment || ""}\n`;
+      });
+    }
+
+    report += "\nDARK SHIFTS:\n";
+    if (darkShifts.length === 0) {
+      report += "None\n";
+    } else {
+      darkShifts.forEach(shift => {
+        if (!shift) return;
+        report += `- ${shift.site || ""} ${shift.time || ""}\n`;
+      });
+    }
+
+    // Add source at the end of report content
+    report += `\nSource: Rochak Kadel Scheduling Board`;
+
+    // Create HTML version with colors
+    const lines = report.split('\n');
+    const htmlReport = lines
+      .map((line, index) => {
+        if (line.trim() === '') return '<br>';
+        // First line (title) should be bigger
+        if (index === 0) {
+          return `<div style="font-size: 2rem; color: #ef4444; font-weight: bold;">${line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>`;
+        }
+        // Headers (lines ending with :) should be red and bold
+        if (line.endsWith(':')) {
+          const headerText = line.replace(/:/g, '');
+          return `<strong style="color: #ef4444;">${headerText}:</strong>`;
+        }
+        // Escape HTML characters
+        return line
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;');
+      })
+      .join('<br>');
+
+    setReportContent(report);
+    setReportContentHtml(htmlReport);
+    setShowReport(true);
+    } catch (error) {
+      console.error("Error generating report:", error);
+      console.error("Error stack:", error.stack);
+      const errorMessage = error.message || String(error);
+      const errorText = `Error generating report: ${errorMessage}\n\nPlease check the browser console (F12) for more details.`;
+      alert(`An error occurred while generating the report: ${errorMessage}\n\nPlease check the console for more details.`);
+      setReportContent(errorText);
+      setReportContentHtml(errorText.replace(/\n/g, '<br>'));
+      setShowReport(true);
+    }
+  };
+
+  const copyToClipboard = async () => {
+    // Report content already includes Source at the end
+    const fullReport = reportContent;
+    
+    // Create HTML version with red headers
+    const htmlContent = reportContentHtml 
+      ? reportContentHtml
+      : fullReport
+          .split('\n')
+          .map(line => {
+            if (line.trim() === '') return '<br>';
+            // Headers (lines ending with :) should be red and bold
+            if (line.endsWith(':')) {
+              const headerText = line.replace(/:/g, '');
+              return `<strong style="color: #ef4444;">${headerText}:</strong>`;
+            }
+            return line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+          })
+          .join('<br>');
+    
+    try {
+      // Try to copy with both HTML and plain text for better Outlook compatibility
+      if (navigator.clipboard && navigator.clipboard.write) {
+        const htmlBlob = new Blob([`<html><body style="font-family: monospace; white-space: pre-wrap; font-size: 0.95rem;">${htmlContent}</body></html>`], { type: 'text/html' });
+        const textBlob = new Blob([fullReport], { type: 'text/plain' });
+        
+        const data = new ClipboardItem({
+          'text/html': htmlBlob,
+          'text/plain': textBlob
+        });
+        
+        await navigator.clipboard.write([data]);
+        // No alert - silently copy
+      } else {
+        // Fallback to plain text
+        await navigator.clipboard.writeText(fullReport);
+        // No alert - silently copy
+      }
+    } catch (err) {
+      // Fallback to plain text if HTML copy fails
+      try {
+        await navigator.clipboard.writeText(fullReport);
+        // No alert - silently copy
+      } catch (textErr) {
+        console.error("Failed to copy:", textErr);
+        // Last resort: create a temporary textarea and copy from it
+        const textarea = document.createElement('textarea');
+        textarea.value = fullReport;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+        try {
+          document.execCommand('copy');
+          // No alert - silently copy
+        } catch (execErr) {
+          // Only show error if all methods fail
+          console.error("Failed to copy report:", execErr);
+        }
+        document.body.removeChild(textarea);
+      }
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: "rgba(0, 0, 0, 0.8)",
+        zIndex: 1000,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "2rem",
+      }}
+    >
+      <div
+        ref={modalRef}
+        style={{
+          backgroundColor: "rgba(15, 23, 42, 0.98)",
+          border: "2px solid rgba(148, 163, 184, 0.5)",
+          borderRadius: "0.75rem",
+          padding: "2rem",
+          maxWidth: "800px",
+          width: "100%",
+          maxHeight: "90vh",
+          overflowY: "auto",
+          boxShadow: "0 20px 60px rgba(0, 0, 0, 0.8)",
+        }}
+      >
+        {!showReport ? (
+          <>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" }}>
+              <h2 style={{ color: "#e2e8f0", fontSize: "1.5rem", fontWeight: "bold", margin: 0 }}>Generate Report</h2>
+              <button
+                onClick={onClose}
+                style={{
+                  backgroundColor: "transparent",
+                  border: "1px solid rgba(148, 163, 184, 0.45)",
+                  color: "#e2e8f0",
+                  borderRadius: "0.375rem",
+                  padding: "0.4rem 0.75rem",
+                  cursor: "pointer",
+                  fontSize: "1rem",
+                  fontWeight: 600,
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = "rgba(239, 68, 68, 0.2)";
+                  e.currentTarget.style.borderColor = "rgba(239, 68, 68, 0.75)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = "transparent";
+                  e.currentTarget.style.borderColor = "rgba(148, 163, 184, 0.45)";
+                }}
+              >
+                Close
+              </button>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+              <div>
+                <label style={{ ...modalLabelStyle, marginBottom: "0.5rem" }}>Date</label>
+                <input
+                  type="date"
+                  value={reportDate}
+                  onChange={(e) => setReportDate(e.target.value)}
+                  style={modalInputStyle}
+                />
+              </div>
+              <div style={{ display: "flex", gap: "1rem" }}>
+                <div style={{ flex: 1 }}>
+                  <label style={{ ...modalLabelStyle, marginBottom: "0.5rem" }}>Start Time (HHMM)</label>
+                  <input
+                    type="text"
+                    value={startTime}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/\D/g, '').slice(0, 4);
+                      setStartTime(val);
+                    }}
+                    placeholder="0700"
+                    style={modalInputStyle}
+                  />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label style={{ ...modalLabelStyle, marginBottom: "0.5rem" }}>End Time (HHMM)</label>
+                  <input
+                    type="text"
+                    value={endTime}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/\D/g, '').slice(0, 4);
+                      setEndTime(val);
+                    }}
+                    placeholder="1500"
+                    style={modalInputStyle}
+                  />
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  generateReport();
+                }}
+                style={{
+                  ...modalPrimaryButtonStyle,
+                  marginTop: "1rem",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = "translateY(-2px)";
+                  e.currentTarget.style.boxShadow = "0 10px 20px rgba(37, 99, 235, 0.4)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = "none";
+                  e.currentTarget.style.boxShadow = "none";
+                }}
+              >
+                Generate Report
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <div
+              style={{
+                backgroundColor: "rgba(30, 41, 59, 0.5)",
+                padding: "1.5rem",
+                borderRadius: "0.5rem",
+                border: "1px solid rgba(148, 163, 184, 0.2)",
+                marginBottom: "1.5rem",
+                fontFamily: "monospace",
+                fontSize: "0.95rem",
+                color: "#e2e8f0",
+                lineHeight: "1.6",
+                maxHeight: "60vh",
+                overflowY: "auto",
+              }}
+              dangerouslySetInnerHTML={{ __html: reportContentHtml || reportContent.replace(/\n/g, '<br>') }}
+            />
+            <div style={{ display: "flex", gap: "1rem", justifyContent: "flex-end" }}>
+              <button
+                onClick={() => {
+                  setShowReport(false);
+                  setReportContent("");
+                  setReportContentHtml("");
+                }}
+                style={modalSecondaryButtonStyle}
+              >
+                Back
+              </button>
+              <button
+                onClick={async () => {
+                  await copyToClipboard();
+                  setCopyButtonText("Copied!");
+                  setTimeout(() => {
+                    setCopyButtonText("Copy Content");
+                  }, 2000);
+                }}
+                style={{
+                  ...modalPrimaryButtonStyle,
+                  transition: "all 0.3s ease",
+                }}
+              >
+                {copyButtonText}
+              </button>
+              <button
+                onClick={onClose}
+                style={{
+                  ...modalSecondaryButtonStyle,
+                  backgroundColor: "rgba(239, 68, 68, 0.2)",
+                  borderColor: "rgba(239, 68, 68, 0.5)",
+                  color: "#fca5a5",
+                }}
+              >
+                Close
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
+
+/**
  * Legend Panel Component
  */
 const LegendPanel = ({ isOpen, onClose }) => {
@@ -1142,6 +1728,7 @@ const Header = ({
   const [isAvatarMenuOpen, setIsAvatarMenuOpen] = useState(false);
   const avatarMenuRef = useClickOutside(() => setIsAvatarMenuOpen(false));
   const [isLegendOpen, setIsLegendOpen] = useState(false);
+  const [isReportOpen, setIsReportOpen] = useState(false);
 
   const navButtonStyle = {
     padding: "0.35rem 0.55rem",
@@ -1245,6 +1832,24 @@ const Header = ({
           onSelectSite={onOpenSearch}
           db={db}
         />
+        <button
+          className="micro-pressable micro-pill"
+          type="button"
+          onClick={() => setIsReportOpen(true)}
+          style={linkButtonStyle}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.border = "1px solid rgba(34, 197, 94, 0.75)";
+            e.currentTarget.style.color = "#86efac";
+            e.currentTarget.style.transform = "translateY(-1px)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.border = "1px solid rgba(148, 163, 184, 0.45)";
+            e.currentTarget.style.color = "#e2e8f0";
+            e.currentTarget.style.transform = "none";
+          }}
+        >
+          Report
+        </button>
         <button
           className="micro-pressable micro-pill"
           type="button"
@@ -1578,6 +2183,12 @@ const Header = ({
         )}
       </div>
     </header>
+    <ReportModal 
+      isOpen={isReportOpen} 
+      onClose={() => setIsReportOpen(false)} 
+      weekData={weekData}
+      db={db}
+    />
     <LegendPanel isOpen={isLegendOpen} onClose={() => setIsLegendOpen(false)} />
     </>
   );
@@ -9251,3 +9862,6 @@ export default App;
 
 
                                 
+
+
+
