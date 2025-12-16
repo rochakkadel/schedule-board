@@ -886,7 +886,7 @@ const ReportModal = ({ isOpen, onClose, weekData, db }) => {
       const day = String(parseInt(dateParts[2])).padStart(2, '0');
       const dateStr = `${month}/${day}`;
       
-      let report = `${dateStr} ${startTime}-${endTime} PASSDOWN REPORT\n\n`;
+      let report = `${dateStr} |  ${startTime}-${endTime} | REPORT\n\n`;
       
       const openShifts = [];
       const opsShifts = [];
@@ -1276,6 +1276,15 @@ const ReportModal = ({ isOpen, onClose, weekData, db }) => {
                       const val = e.target.value.replace(/\D/g, '').slice(0, 4);
                       setStartTime(val);
                     }}
+                    onFocus={(e) => {
+                      e.target.select();
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        generateReport();
+                      }
+                    }}
                     placeholder="0700"
                     style={modalInputStyle}
                   />
@@ -1288,6 +1297,15 @@ const ReportModal = ({ isOpen, onClose, weekData, db }) => {
                     onChange={(e) => {
                       const val = e.target.value.replace(/\D/g, '').slice(0, 4);
                       setEndTime(val);
+                    }}
+                    onFocus={(e) => {
+                      e.target.select();
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        generateReport();
+                      }
                     }}
                     placeholder="1500"
                     style={modalInputStyle}
@@ -1848,7 +1866,7 @@ const Header = ({
             e.currentTarget.style.transform = "none";
           }}
         >
-          Report
+          REPORTS
         </button>
         <button
           className="micro-pressable micro-pill"
